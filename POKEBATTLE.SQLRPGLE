@@ -1,0 +1,1475 @@
+**free
+// =============================================================
+// POKEBATTLE - Gen 1 Pokemon Battle Engine
+// Reads teams from BATTLE_SESSION/BATTLE_POKEMON tables.
+// Supports SP (vs AI) and MP (vs human) modes.
+// Supports full teams with switching on faint.
+// =============================================================
+ctl-opt dftactgrp(*no) actgrp(*new)
+        option(*srcstmt : *nodebugio);
+
+exec sql SET OPTION COMMIT = *NONE;
+
+dcl-f POKEBATTL workstn;
+
+// Program interface - receive room code and player number
+dcl-pi *n;
+  pRoomCode char(8);
+  pPlayer   int(5);
+end-pi;
+
+// CL command executor for DLYJOB
+dcl-pr QCMDEXC extpgm('QCMDEXC');
+  cmd    char(256) const;
+  cmdLen packed(15:5) const;
+end-pr;
+
+// ----- Template Data Structures -----
+dcl-ds move_t qualified template;
+  id    int(5);
+  name  char(20);
+  typ   int(5);
+  power int(5);
+  acc   int(5);
+  pp    int(5);
+  curPP int(5);
+  phys  char(1);
+end-ds;
+
+dcl-ds pkmn_t qualified template;
+  id      int(5);
+  name    char(12);
+  type1   int(5);
+  type2   int(5);
+  t1name  char(10);
+  t2name  char(10);
+  level   int(5);
+  hp      int(5);
+  maxHp   int(5);
+  atk     int(5);
+  def     int(5);
+  spAtk   int(5);
+  spDef   int(5);
+  speed   int(5);
+  cry     char(30);
+  art     varchar(500);
+  moves   likeds(move_t) dim(4);
+  slot    int(5);
+end-ds;
+
+dcl-ds dmg_t qualified template;
+  damage  int(5);
+  didHit  ind;
+  isCrit  ind;
+  typeEff packed(5:2);
+end-ds;
+
+// ----- Subprocedure Prototypes -----
+dcl-pr CalcDamage likeds(dmg_t);
+  attacker likeds(pkmn_t) const;
+  defender likeds(pkmn_t) const;
+  move     likeds(move_t) const;
+  pAccRoll packed(7:6) const options(*nopass);
+  pCrtRoll packed(7:6) const options(*nopass);
+  pDmgRoll packed(7:6) const options(*nopass);
+end-pr;
+
+dcl-pr BuildHPBar char(20);
+  curHP int(5) const;
+  maxHP int(5) const;
+end-pr;
+
+dcl-pr ShowMsg;
+  m1 char(70) const;
+  m2 char(70) const options(*nopass);
+  m3 char(70) const options(*nopass);
+end-pr;
+
+dcl-pr ParseArt;
+  artStr varchar(500) const;
+  l1  char(25);
+  l2  char(25);
+  l3  char(25);
+  l4  char(25);
+  l5  char(25);
+  l6  char(25);
+  l7  char(25);
+  l8  char(25);
+  l9  char(25);
+  l10 char(25);
+end-pr;
+
+dcl-pr LoadActivePkmn ind;
+  ds     likeds(pkmn_t);
+  room   char(8) const;
+  player int(5) const;
+end-pr;
+
+dcl-pr SavePkmnState;
+  ds     likeds(pkmn_t) const;
+  room   char(8) const;
+  player int(5) const;
+end-pr;
+
+// ----- Global Variables -----
+dcl-ds plyr likeds(pkmn_t) inz;
+dcl-ds enmy likeds(pkmn_t) inz;
+dcl-ds result likeds(dmg_t) inz;
+dcl-ds result2 likeds(dmg_t) inz;
+
+dcl-s battleOn ind inz(*on);
+dcl-s moveChoice int(5);
+dcl-s aiMoveIdx int(5);
+dcl-s enmyMoveIdx int(5);
+dcl-s i int(5);
+dcl-s enmyPlayer int(5);
+
+dcl-s randVal packed(7:6);
+dcl-s battleMode char(2);
+
+// Team tracking
+dcl-s plyrAlive int(5);
+dcl-s enmyAlive int(5);
+dcl-s switchOk ind;
+dcl-s plyrFainted ind;
+dcl-s enmyFainted ind;
+
+// Switch menu work variables
+dcl-s swSlot  int(5) dim(6);
+dcl-s swName  char(12) dim(6);
+dcl-s swCurHP int(5) dim(6);
+dcl-s swMaxHP int(5) dim(6);
+dcl-s swCount int(5);
+dcl-s swChoice int(5);
+dcl-s wSlot   int(5);
+dcl-s wSName  char(12);
+dcl-s wSCurHP int(5);
+dcl-s wSMaxHP int(5);
+
+// SQL work variables for move loading
+dcl-s wMvId  int(5);
+dcl-s wMvNm  char(20);
+dcl-s wMvTyp int(5);
+dcl-s wMvPwr int(5);
+dcl-s wMvAcc int(5);
+dcl-s wMvPP  int(5);
+dcl-s wMvPhy char(1);
+dcl-s niPwr  int(5);
+
+// MP sync variables
+dcl-s turnState char(10);
+dcl-s wP1Move int(5);
+dcl-s wP2Move int(5);
+dcl-s firstAtk int(5);
+dcl-s p1Acc packed(7:6);
+dcl-s p1Crt packed(7:6);
+dcl-s p1Dmg packed(7:6);
+dcl-s p2Acc packed(7:6);
+dcl-s p2Crt packed(7:6);
+dcl-s p2Dmg packed(7:6);
+dcl-s myAcc packed(7:6);
+dcl-s myCrt packed(7:6);
+dcl-s myDmg packed(7:6);
+dcl-s opAcc packed(7:6);
+dcl-s opCrt packed(7:6);
+dcl-s opDmg packed(7:6);
+dcl-s wOldActive char(1);
+
+// =============================================================
+// MAINLINE
+// =============================================================
+
+// Read battle mode from session
+exec sql
+  SELECT MODE INTO :battleMode
+    FROM NHAGENCO1.BATTLE_SESSION
+   WHERE ROOM_CODE = :pRoomCode;
+
+// Determine enemy player number
+enmyPlayer = 2;
+if pPlayer = 2;
+  enmyPlayer = 1;
+endif;
+
+// Load active Pokemon for both sides
+if not LoadActivePkmn(plyr : pRoomCode : pPlayer);
+  *inlr = *on;
+  return;
+endif;
+if not LoadActivePkmn(enmy : pRoomCode : enmyPlayer);
+  *inlr = *on;
+  return;
+endif;
+
+// =============================================================
+// INITIAL DISPLAY
+// =============================================================
+
+ROOMCD = pRoomCode;
+BMODE = battleMode;
+write HEADER;
+
+exsr RefreshEnemy;
+
+DIVLIN = *all'-';
+write DIVIDER;
+
+exsr RefreshPlayer;
+
+// Battle entry narration
+if battleMode = 'SP';
+  ShowMsg('Wild ' + %trim(enmy.name) + ' appeared!');
+else;
+  ShowMsg('Opponent sent out ' + %trim(enmy.name) + '!');
+endif;
+if enmy.cry <> *blanks;
+  ShowMsg(%trim(enmy.name) + ': ' + %trim(enmy.cry));
+endif;
+ShowMsg('Go! ' + %trim(plyr.name) + '!');
+if plyr.cry <> *blanks;
+  ShowMsg(%trim(plyr.name) + ': ' + %trim(plyr.cry));
+endif;
+
+// =============================================================
+// BATTLE LOOP
+// =============================================================
+dow battleOn;
+
+  // Populate move menu
+  MV1NAM = plyr.moves(1).name;
+  MV1PP = %trim(%char(plyr.moves(1).curPP)) + '/'
+        + %trim(%char(plyr.moves(1).pp));
+  MV2NAM = plyr.moves(2).name;
+  MV2PP = %trim(%char(plyr.moves(2).curPP)) + '/'
+        + %trim(%char(plyr.moves(2).pp));
+  MV3NAM = plyr.moves(3).name;
+  MV3PP = %trim(%char(plyr.moves(3).curPP)) + '/'
+        + %trim(%char(plyr.moves(3).pp));
+  MV4NAM = plyr.moves(4).name;
+  MV4PP = %trim(%char(plyr.moves(4).curPP)) + '/'
+        + %trim(%char(plyr.moves(4).pp));
+  MVSEL = ' ';
+
+  exfmt MOVEMENU;
+
+  if *in03;
+    leave;
+  endif;
+
+  if MVSEL < '1' or MVSEL > '4';
+    iter;
+  endif;
+  moveChoice = %int(MVSEL);
+
+  if plyr.moves(moveChoice).curPP <= 0;
+    iter;
+  endif;
+  if plyr.moves(moveChoice).id = 0;
+    iter;
+  endif;
+
+  // -------------------------------------------------------
+  // GET OPPONENT MOVE + RESOLVE
+  // -------------------------------------------------------
+  if battleMode = 'SP';
+    // AI picks random damaging move
+    exec sql SET :randVal = RAND();
+    aiMoveIdx = %int(randVal * 4) + 1;
+    if aiMoveIdx > 4;
+      aiMoveIdx = 4;
+    endif;
+    for i = 1 to 4;
+      if enmy.moves(aiMoveIdx).power > 0
+         and enmy.moves(aiMoveIdx).id <> 0;
+        leave;
+      endif;
+      aiMoveIdx += 1;
+      if aiMoveIdx > 4;
+        aiMoveIdx = 1;
+      endif;
+    endfor;
+    enmyMoveIdx = aiMoveIdx;
+
+    // Determine turn order
+    if plyr.speed >= enmy.speed;
+      firstAtk = pPlayer;
+    else;
+      firstAtk = enmyPlayer;
+    endif;
+
+    // SP: calc damage with fresh randoms
+    exsr ResolveTurn;
+
+  else;
+    // MP: write our move, wait for opponent, then resolve
+    exsr MPExchangeMoves;
+    if not battleOn;
+      leave;
+    endif;
+    exsr ResolveTurn;
+  endif;
+
+  // -------------------------------------------------------
+  // FAINT CHECKING (handles simultaneous faints)
+  // -------------------------------------------------------
+  plyrFainted = (plyr.hp <= 0);
+  enmyFainted = (enmy.hp <= 0);
+
+  // Both fainted = check who has remaining team
+  if plyrFainted and enmyFainted;
+    ShowMsg(%trim(enmy.name) + ' fainted!');
+    ShowMsg(%trim(plyr.name) + ' fainted!');
+    SavePkmnState(plyr : pRoomCode : pPlayer);
+    SavePkmnState(enmy : pRoomCode : enmyPlayer);
+
+    // Force HP=0 for fainted active Pokemon (belt & suspenders)
+    exec sql
+      UPDATE NHAGENCO1.BATTLE_POKEMON
+         SET CURRENT_HP = 0
+       WHERE ROOM_CODE = :pRoomCode
+         AND PLAYER = :pPlayer AND IS_ACTIVE = 'Y';
+    exec sql
+      UPDATE NHAGENCO1.BATTLE_POKEMON
+         SET CURRENT_HP = 0
+       WHERE ROOM_CODE = :pRoomCode
+         AND PLAYER = :enmyPlayer AND IS_ACTIVE = 'Y';
+
+    exec sql
+      SELECT COUNT(*) INTO :plyrAlive
+        FROM NHAGENCO1.BATTLE_POKEMON
+       WHERE ROOM_CODE = :pRoomCode
+         AND PLAYER = :pPlayer AND CURRENT_HP > 0;
+    exec sql
+      SELECT COUNT(*) INTO :enmyAlive
+        FROM NHAGENCO1.BATTLE_POKEMON
+       WHERE ROOM_CODE = :pRoomCode
+         AND PLAYER = :enmyPlayer AND CURRENT_HP > 0;
+
+    if plyrAlive = 0 and enmyAlive = 0;
+      ShowMsg('It''s a draw!');
+      QCMDEXC('DLYJOB DLY(2)' : 13);
+      battleOn = *off;
+    elseif plyrAlive = 0;
+      ShowMsg('You lost...');
+      QCMDEXC('DLYJOB DLY(2)' : 13);
+      battleOn = *off;
+    elseif enmyAlive = 0;
+      ShowMsg('You win!');
+      QCMDEXC('DLYJOB DLY(2)' : 13);
+      battleOn = *off;
+    else;
+      // Both need to switch
+      exsr HandleEnemySwitch;
+      exsr HandlePlayerSwitch;
+    endif;
+
+  elseif enmyFainted;
+    ShowMsg(%trim(enmy.name) + ' fainted!');
+    SavePkmnState(enmy : pRoomCode : enmyPlayer);
+
+    exec sql
+      UPDATE NHAGENCO1.BATTLE_POKEMON
+         SET CURRENT_HP = 0
+       WHERE ROOM_CODE = :pRoomCode
+         AND PLAYER = :enmyPlayer AND IS_ACTIVE = 'Y';
+
+    exec sql
+      SELECT COUNT(*) INTO :enmyAlive
+        FROM NHAGENCO1.BATTLE_POKEMON
+       WHERE ROOM_CODE = :pRoomCode
+         AND PLAYER = :enmyPlayer AND CURRENT_HP > 0;
+
+    if enmyAlive = 0;
+      ShowMsg('You win!');
+      QCMDEXC('DLYJOB DLY(2)' : 13);
+      battleOn = *off;
+    else;
+      exsr HandleEnemySwitch;
+    endif;
+
+  elseif plyrFainted;
+    ShowMsg(%trim(plyr.name) + ' fainted!');
+    SavePkmnState(plyr : pRoomCode : pPlayer);
+
+    exec sql
+      UPDATE NHAGENCO1.BATTLE_POKEMON
+         SET CURRENT_HP = 0
+       WHERE ROOM_CODE = :pRoomCode
+         AND PLAYER = :pPlayer AND IS_ACTIVE = 'Y';
+
+    exec sql
+      SELECT COUNT(*) INTO :plyrAlive
+        FROM NHAGENCO1.BATTLE_POKEMON
+       WHERE ROOM_CODE = :pRoomCode
+         AND PLAYER = :pPlayer AND CURRENT_HP > 0;
+
+    if plyrAlive = 0;
+      ShowMsg('You lost...');
+      QCMDEXC('DLYJOB DLY(2)' : 13);
+      battleOn = *off;
+    else;
+      exsr HandlePlayerSwitch;
+    endif;
+  endif;
+
+  // Save state after each turn
+  if battleOn;
+    SavePkmnState(plyr : pRoomCode : pPlayer);
+    SavePkmnState(enmy : pRoomCode : enmyPlayer);
+  endif;
+
+  // MP: P1 resets turn state for next round
+  if battleOn and battleMode = 'MP' and pPlayer = 1;
+    exec sql
+      UPDATE NHAGENCO1.BATTLE_SESSION
+         SET TURN_STATE = 'P1_PICK',
+             P1_MOVE = NULL, P2_MOVE = NULL
+       WHERE ROOM_CODE = :pRoomCode;
+  endif;
+
+enddo;
+
+// MP: mark session done
+if battleMode = 'MP';
+  exec sql
+    UPDATE NHAGENCO1.BATTLE_SESSION
+       SET STATUS = 'DONE'
+     WHERE ROOM_CODE = :pRoomCode;
+endif;
+
+*inlr = *on;
+return;
+
+// =============================================================
+// SUBROUTINES
+// =============================================================
+
+// --- Resolve a turn: both attacks in speed order ---
+begsr ResolveTurn;
+  if battleMode = 'SP';
+    // SP: use fresh randoms from CalcDamage
+    if firstAtk = pPlayer;
+      exsr DoPlayerAttack;
+      if enmy.hp > 0 and battleOn;
+        exsr DoEnemyAttack;
+      endif;
+    else;
+      exsr DoEnemyAttack;
+      if plyr.hp > 0 and battleOn;
+        exsr DoPlayerAttack;
+      endif;
+    endif;
+  else;
+    // MP: use shared randoms
+    if firstAtk = pPlayer;
+      exsr DoPlayerAttackMP;
+      if enmy.hp > 0;
+        exsr DoEnemyAttackMP;
+      endif;
+    else;
+      exsr DoEnemyAttackMP;
+      if plyr.hp > 0;
+        exsr DoPlayerAttackMP;
+      endif;
+    endif;
+  endif;
+endsr;
+
+// --- MP: Exchange moves with opponent ---
+begsr MPExchangeMoves;
+  // Write our move to session
+  if pPlayer = 1;
+    wP1Move = plyr.moves(moveChoice).id;
+    exec sql
+      UPDATE NHAGENCO1.BATTLE_SESSION
+         SET P1_MOVE = :wP1Move
+       WHERE ROOM_CODE = :pRoomCode;
+  else;
+    wP2Move = plyr.moves(moveChoice).id;
+    exec sql
+      UPDATE NHAGENCO1.BATTLE_SESSION
+         SET P2_MOVE = :wP2Move
+       WHERE ROOM_CODE = :pRoomCode;
+  endif;
+
+  ShowMsg('Waiting for opponent...');
+
+  // Poll until opponent's move is set
+  if pPlayer = 1;
+    wP2Move = 0;
+    dow wP2Move = 0;
+      QCMDEXC('DLYJOB DLY(1)' : 13);
+      exec sql
+        SELECT COALESCE(P2_MOVE, 0) INTO :wP2Move
+          FROM NHAGENCO1.BATTLE_SESSION
+         WHERE ROOM_CODE = :pRoomCode;
+    enddo;
+  else;
+    wP1Move = 0;
+    dow wP1Move = 0;
+      QCMDEXC('DLYJOB DLY(1)' : 13);
+      exec sql
+        SELECT COALESCE(P1_MOVE, 0) INTO :wP1Move
+          FROM NHAGENCO1.BATTLE_SESSION
+         WHERE ROOM_CODE = :pRoomCode;
+    enddo;
+  endif;
+
+  // Find opponent's move index from their active Pokemon
+  enmyMoveIdx = 0;
+  if pPlayer = 1;
+    for i = 1 to 4;
+      if enmy.moves(i).id = wP2Move;
+        enmyMoveIdx = i;
+        leave;
+      endif;
+    endfor;
+  else;
+    for i = 1 to 4;
+      if enmy.moves(i).id = wP1Move;
+        enmyMoveIdx = i;
+        leave;
+      endif;
+    endfor;
+  endif;
+  if enmyMoveIdx = 0;
+    enmyMoveIdx = 1;
+  endif;
+
+  // P1 generates random rolls and speed order
+  if pPlayer = 1;
+    exec sql SET :p1Acc = RAND();
+    exec sql SET :p1Crt = RAND();
+    exec sql SET :p1Dmg = RAND();
+    exec sql SET :p2Acc = RAND();
+    exec sql SET :p2Crt = RAND();
+    exec sql SET :p2Dmg = RAND();
+
+    // Speed order (P1's perspective: plyr=P1, enmy=P2)
+    if plyr.speed >= enmy.speed;
+      firstAtk = 1;
+    else;
+      firstAtk = 2;
+    endif;
+
+    exec sql
+      UPDATE NHAGENCO1.BATTLE_SESSION
+         SET P1_ACC = :p1Acc, P1_CRT = :p1Crt, P1_DMG = :p1Dmg,
+             P2_ACC = :p2Acc, P2_CRT = :p2Crt, P2_DMG = :p2Dmg,
+             FIRST_ATK = :firstAtk,
+             TURN_STATE = 'RESOLVE'
+       WHERE ROOM_CODE = :pRoomCode;
+  else;
+    // P2 polls until P1 resolves
+    turnState = *blanks;
+    dow turnState <> 'RESOLVE';
+      QCMDEXC('DLYJOB DLY(1)' : 13);
+      exec sql
+        SELECT TURN_STATE INTO :turnState
+          FROM NHAGENCO1.BATTLE_SESSION
+         WHERE ROOM_CODE = :pRoomCode;
+    enddo;
+
+    // Read shared randoms
+    exec sql
+      SELECT P1_ACC, P1_CRT, P1_DMG,
+             P2_ACC, P2_CRT, P2_DMG, FIRST_ATK
+        INTO :p1Acc, :p1Crt, :p1Dmg,
+             :p2Acc, :p2Crt, :p2Dmg, :firstAtk
+        FROM NHAGENCO1.BATTLE_SESSION
+       WHERE ROOM_CODE = :pRoomCode;
+  endif;
+
+  // Map P1/P2 randoms to my/opponent based on which player we are
+  if pPlayer = 1;
+    myAcc = p1Acc;
+    myCrt = p1Crt;
+    myDmg = p1Dmg;
+    opAcc = p2Acc;
+    opCrt = p2Crt;
+    opDmg = p2Dmg;
+  else;
+    myAcc = p2Acc;
+    myCrt = p2Crt;
+    myDmg = p2Dmg;
+    opAcc = p1Acc;
+    opCrt = p1Crt;
+    opDmg = p1Dmg;
+  endif;
+endsr;
+
+// --- Refresh opponent display ---
+begsr RefreshEnemy;
+  OPNAME = enmy.name;
+  OPLVL = 'Lv' + %trim(%char(enmy.level));
+  if enmy.type2 <> 0;
+    OPTYPE = %trim(enmy.t1name) + '/' + %trim(enmy.t2name);
+  else;
+    OPTYPE = enmy.t1name;
+  endif;
+  OPHPBR = BuildHPBar(enmy.hp : enmy.maxHp);
+  OPCRHP = enmy.hp;
+  OPMXHP = enmy.maxHp;
+  OPSTAT = *blanks;
+  ParseArt(enmy.art : OPART1 : OPART2 : OPART3 : OPART4 : OPART5
+                     : OPART6 : OPART7 : OPART8 : OPART9 : OPARTA);
+  write OPPONENT;
+endsr;
+
+// --- Refresh player display ---
+begsr RefreshPlayer;
+  PLNAME = plyr.name;
+  PLLVL = 'Lv' + %trim(%char(plyr.level));
+  if plyr.type2 <> 0;
+    PLTYPE = %trim(plyr.t1name) + '/' + %trim(plyr.t2name);
+  else;
+    PLTYPE = plyr.t1name;
+  endif;
+  PLHPBR = BuildHPBar(plyr.hp : plyr.maxHp);
+  PLCRHP = plyr.hp;
+  PLMXHP = plyr.maxHp;
+  PLSTAT = *blanks;
+  ParseArt(plyr.art : PLART1 : PLART2 : PLART3 : PLART4 : PLART5
+                     : PLART6 : PLART7 : PLART8 : PLART9 : PLARTA);
+  write PLAYER;
+endsr;
+
+// --- SP: Player attacks enemy (fresh randoms) ---
+begsr DoPlayerAttack;
+  plyr.moves(moveChoice).curPP -= 1;
+
+  ShowMsg(%trim(plyr.name) + ' used '
+        + %trim(plyr.moves(moveChoice).name) + '!');
+
+  if plyr.moves(moveChoice).power = 0;
+    ShowMsg('But nothing happened!');
+    leavesr;
+  endif;
+
+  result = CalcDamage(plyr : enmy : plyr.moves(moveChoice));
+
+  if not result.didHit;
+    ShowMsg(%trim(plyr.name) + '''s attack missed!');
+    leavesr;
+  endif;
+
+  if result.typeEff = 0;
+    ShowMsg('It doesn''t affect ' + %trim(enmy.name) + '...');
+    leavesr;
+  endif;
+
+  enmy.hp -= result.damage;
+  if enmy.hp < 0;
+    enmy.hp = 0;
+  endif;
+  OPHPBR = BuildHPBar(enmy.hp : enmy.maxHp);
+  OPCRHP = enmy.hp;
+  write OPPONENT;
+  QCMDEXC('DLYJOB DLY(1)' : 13);
+
+  if result.isCrit;
+    ShowMsg('A critical hit!');
+  endif;
+  if result.typeEff > 1;
+    ShowMsg('It''s super effective!');
+  elseif result.typeEff < 1;
+    ShowMsg('It''s not very effective...');
+  endif;
+endsr;
+
+// --- SP: Enemy attacks player (fresh randoms) ---
+begsr DoEnemyAttack;
+  enmy.moves(enmyMoveIdx).curPP -= 1;
+
+  ShowMsg(%trim(enmy.name) + ' used '
+        + %trim(enmy.moves(enmyMoveIdx).name) + '!');
+
+  if enmy.moves(enmyMoveIdx).power = 0;
+    ShowMsg('But nothing happened!');
+    leavesr;
+  endif;
+
+  result = CalcDamage(enmy : plyr : enmy.moves(enmyMoveIdx));
+
+  if not result.didHit;
+    ShowMsg(%trim(enmy.name) + '''s attack missed!');
+    leavesr;
+  endif;
+
+  if result.typeEff = 0;
+    ShowMsg('It doesn''t affect ' + %trim(plyr.name) + '...');
+    leavesr;
+  endif;
+
+  plyr.hp -= result.damage;
+  if plyr.hp < 0;
+    plyr.hp = 0;
+  endif;
+  PLHPBR = BuildHPBar(plyr.hp : plyr.maxHp);
+  PLCRHP = plyr.hp;
+  write PLAYER;
+  QCMDEXC('DLYJOB DLY(1)' : 13);
+
+  if result.isCrit;
+    ShowMsg('A critical hit!');
+  endif;
+  if result.typeEff > 1;
+    ShowMsg('It''s super effective!');
+  elseif result.typeEff < 1;
+    ShowMsg('It''s not very effective...');
+  endif;
+endsr;
+
+// --- MP: Player attacks with shared randoms ---
+begsr DoPlayerAttackMP;
+  plyr.moves(moveChoice).curPP -= 1;
+
+  ShowMsg(%trim(plyr.name) + ' used '
+        + %trim(plyr.moves(moveChoice).name) + '!');
+
+  if plyr.moves(moveChoice).power = 0;
+    ShowMsg('But nothing happened!');
+    leavesr;
+  endif;
+
+  result = CalcDamage(plyr : enmy : plyr.moves(moveChoice)
+                     : myAcc : myCrt : myDmg);
+
+  if not result.didHit;
+    ShowMsg(%trim(plyr.name) + '''s attack missed!');
+    leavesr;
+  endif;
+
+  if result.typeEff = 0;
+    ShowMsg('It doesn''t affect ' + %trim(enmy.name) + '...');
+    leavesr;
+  endif;
+
+  enmy.hp -= result.damage;
+  if enmy.hp < 0;
+    enmy.hp = 0;
+  endif;
+  OPHPBR = BuildHPBar(enmy.hp : enmy.maxHp);
+  OPCRHP = enmy.hp;
+  write OPPONENT;
+  QCMDEXC('DLYJOB DLY(1)' : 13);
+
+  if result.isCrit;
+    ShowMsg('A critical hit!');
+  endif;
+  if result.typeEff > 1;
+    ShowMsg('It''s super effective!');
+  elseif result.typeEff < 1;
+    ShowMsg('It''s not very effective...');
+  endif;
+endsr;
+
+// --- MP: Enemy attacks with shared randoms ---
+begsr DoEnemyAttackMP;
+  enmy.moves(enmyMoveIdx).curPP -= 1;
+
+  ShowMsg(%trim(enmy.name) + ' used '
+        + %trim(enmy.moves(enmyMoveIdx).name) + '!');
+
+  if enmy.moves(enmyMoveIdx).power = 0;
+    ShowMsg('But nothing happened!');
+    leavesr;
+  endif;
+
+  result = CalcDamage(enmy : plyr : enmy.moves(enmyMoveIdx)
+                     : opAcc : opCrt : opDmg);
+
+  if not result.didHit;
+    ShowMsg(%trim(enmy.name) + '''s attack missed!');
+    leavesr;
+  endif;
+
+  if result.typeEff = 0;
+    ShowMsg('It doesn''t affect ' + %trim(plyr.name) + '...');
+    leavesr;
+  endif;
+
+  plyr.hp -= result.damage;
+  if plyr.hp < 0;
+    plyr.hp = 0;
+  endif;
+  PLHPBR = BuildHPBar(plyr.hp : plyr.maxHp);
+  PLCRHP = plyr.hp;
+  write PLAYER;
+  QCMDEXC('DLYJOB DLY(1)' : 13);
+
+  if result.isCrit;
+    ShowMsg('A critical hit!');
+  endif;
+  if result.typeEff > 1;
+    ShowMsg('It''s super effective!');
+  elseif result.typeEff < 1;
+    ShowMsg('It''s not very effective...');
+  endif;
+endsr;
+
+// --- Handle enemy switching after faint ---
+begsr HandleEnemySwitch;
+  if battleMode = 'SP';
+    // AI: auto-switch to next alive
+    exec sql
+      UPDATE NHAGENCO1.BATTLE_POKEMON
+         SET IS_ACTIVE = 'N'
+       WHERE ROOM_CODE = :pRoomCode
+         AND PLAYER = :enmyPlayer;
+    exec sql
+      UPDATE NHAGENCO1.BATTLE_POKEMON
+         SET IS_ACTIVE = 'Y'
+       WHERE ROOM_CODE = :pRoomCode
+         AND PLAYER = :enmyPlayer
+         AND CURRENT_HP > 0
+         AND TEAM_SLOT = (
+           SELECT MIN(TEAM_SLOT)
+             FROM NHAGENCO1.BATTLE_POKEMON
+            WHERE ROOM_CODE = :pRoomCode
+              AND PLAYER = :enmyPlayer
+              AND CURRENT_HP > 0);
+
+    LoadActivePkmn(enmy : pRoomCode : enmyPlayer);
+    exsr RefreshEnemy;
+    ShowMsg('Opponent sent out ' + %trim(enmy.name) + '!');
+    if enmy.cry <> *blanks;
+      ShowMsg(%trim(enmy.name) + ': ' + %trim(enmy.cry));
+    endif;
+  else;
+    // MP: wait for opponent to switch (they get PickSwitch on their end)
+    ShowMsg('Waiting for opponent to choose...');
+    wOldActive = 'N';
+    dow wOldActive <> 'Y';
+      QCMDEXC('DLYJOB DLY(1)' : 13);
+      // Check if opponent has set a new active Pokemon
+      exec sql
+        SELECT IS_ACTIVE INTO :wOldActive
+          FROM NHAGENCO1.BATTLE_POKEMON
+         WHERE ROOM_CODE = :pRoomCode
+           AND PLAYER = :enmyPlayer
+           AND CURRENT_HP > 0
+           AND IS_ACTIVE = 'Y';
+      if sqlcode <> 0;
+        wOldActive = 'N';
+      endif;
+    enddo;
+
+    LoadActivePkmn(enmy : pRoomCode : enmyPlayer);
+    exsr RefreshEnemy;
+    ShowMsg('Opponent sent out ' + %trim(enmy.name) + '!');
+    if enmy.cry <> *blanks;
+      ShowMsg(%trim(enmy.name) + ': ' + %trim(enmy.cry));
+    endif;
+  endif;
+endsr;
+
+// --- Handle player switching after faint ---
+begsr HandlePlayerSwitch;
+  exsr PickSwitch;
+  if *in03;
+    battleOn = *off;
+  else;
+    exsr RefreshPlayer;
+    ShowMsg('Go! ' + %trim(plyr.name) + '!');
+    if plyr.cry <> *blanks;
+      ShowMsg(%trim(plyr.name) + ': ' + %trim(plyr.cry));
+    endif;
+  endif;
+endsr;
+
+// --- Pick switch Pokemon after faint ---
+begsr PickSwitch;
+  swCount = 0;
+
+  exec sql DECLARE c_switch CURSOR FOR
+    SELECT bp.TEAM_SLOT, p.PKMN_NAME, bp.CURRENT_HP, bp.MAX_HP
+      FROM NHAGENCO1.BATTLE_POKEMON bp
+      JOIN NHAGENCO1.POKEDEX p ON p.PKMN_ID = bp.PKMN_ID
+     WHERE bp.ROOM_CODE = :pRoomCode
+       AND bp.PLAYER = :pPlayer
+       AND bp.CURRENT_HP > 0
+       AND bp.IS_ACTIVE = 'N'
+     ORDER BY bp.TEAM_SLOT;
+
+  exec sql OPEN c_switch;
+  for i = 1 to 6;
+    exec sql FETCH c_switch
+      INTO :wSlot, :wSName, :wSCurHP, :wSMaxHP;
+    if sqlcode <> 0;
+      leave;
+    endif;
+    swCount += 1;
+    swSlot(swCount) = wSlot;
+    swName(swCount) = wSName;
+    swCurHP(swCount) = wSCurHP;
+    swMaxHP(swCount) = wSMaxHP;
+  endfor;
+  exec sql CLOSE c_switch;
+
+  SW1NAM = *blanks;
+  SW1HP  = *blanks;
+  SW2NAM = *blanks;
+  SW2HP  = *blanks;
+  SW3NAM = *blanks;
+  SW3HP  = *blanks;
+  SW4NAM = *blanks;
+  SW4HP  = *blanks;
+  SW5NAM = *blanks;
+  SW5HP  = *blanks;
+  SW6NAM = *blanks;
+  SW6HP  = *blanks;
+
+  for i = 1 to swCount;
+    select;
+      when i = 1;
+        SW1NAM = %trim(%char(i)) + '.' + %trim(swName(i));
+        SW1HP = %trim(%char(swCurHP(i))) + '/'
+              + %trim(%char(swMaxHP(i)));
+      when i = 2;
+        SW2NAM = %trim(%char(i)) + '.' + %trim(swName(i));
+        SW2HP = %trim(%char(swCurHP(i))) + '/'
+              + %trim(%char(swMaxHP(i)));
+      when i = 3;
+        SW3NAM = %trim(%char(i)) + '.' + %trim(swName(i));
+        SW3HP = %trim(%char(swCurHP(i))) + '/'
+              + %trim(%char(swMaxHP(i)));
+      when i = 4;
+        SW4NAM = %trim(%char(i)) + '.' + %trim(swName(i));
+        SW4HP = %trim(%char(swCurHP(i))) + '/'
+              + %trim(%char(swMaxHP(i)));
+      when i = 5;
+        SW5NAM = %trim(%char(i)) + '.' + %trim(swName(i));
+        SW5HP = %trim(%char(swCurHP(i))) + '/'
+              + %trim(%char(swMaxHP(i)));
+      when i = 6;
+        SW6NAM = %trim(%char(i)) + '.' + %trim(swName(i));
+        SW6HP = %trim(%char(swCurHP(i))) + '/'
+              + %trim(%char(swMaxHP(i)));
+    endsl;
+  endfor;
+
+  switchOk = *off;
+  dow not switchOk;
+    SWSEL = ' ';
+    exfmt SWITCHMN;
+
+    if *in03;
+      leavesr;
+    endif;
+
+    if SWSEL < '1' or SWSEL > '6';
+      iter;
+    endif;
+    swChoice = %int(SWSEL);
+    if swChoice > swCount;
+      iter;
+    endif;
+
+    switchOk = *on;
+  enddo;
+
+  exec sql
+    UPDATE NHAGENCO1.BATTLE_POKEMON
+       SET IS_ACTIVE = 'N'
+     WHERE ROOM_CODE = :pRoomCode
+       AND PLAYER = :pPlayer;
+
+  wSlot = swSlot(swChoice);
+  exec sql
+    UPDATE NHAGENCO1.BATTLE_POKEMON
+       SET IS_ACTIVE = 'Y'
+     WHERE ROOM_CODE = :pRoomCode
+       AND PLAYER = :pPlayer
+       AND TEAM_SLOT = :wSlot;
+
+  LoadActivePkmn(plyr : pRoomCode : pPlayer);
+endsr;
+
+// =============================================================
+// SUBPROCEDURES
+// =============================================================
+
+// -------------------------------------------------------------
+// LoadActivePkmn - Load active Pokemon from battle tables
+// -------------------------------------------------------------
+dcl-proc LoadActivePkmn;
+  dcl-pi *n ind;
+    ds     likeds(pkmn_t);
+    room   char(8) const;
+    player int(5) const;
+  end-pi;
+
+  dcl-s wId    int(5);
+  dcl-s wName  char(12);
+  dcl-s wT1    int(5);
+  dcl-s wT2    int(5);
+  dcl-s wT1nm  char(10);
+  dcl-s wT2nm  char(10);
+  dcl-s wHP    int(5);
+  dcl-s wAtk   int(5);
+  dcl-s wDef   int(5);
+  dcl-s wSpA   int(5);
+  dcl-s wSpD   int(5);
+  dcl-s wSpeed int(5);
+  dcl-s wCry   char(30);
+  dcl-s wArt   varchar(500);
+  dcl-s wCurHP int(5);
+  dcl-s wMaxHP int(5);
+  dcl-s wLevel int(5);
+  dcl-s wTeamSlot int(5);
+  dcl-s niT2   int(5);
+  dcl-s niT2nm int(5);
+  dcl-s niCry  int(5);
+  dcl-s niArt  int(5);
+
+  dcl-s wMv1 int(5);
+  dcl-s wMv2 int(5);
+  dcl-s wMv3 int(5);
+  dcl-s wMv4 int(5);
+  dcl-s wPP1 int(5);
+  dcl-s wPP2 int(5);
+  dcl-s wPP3 int(5);
+  dcl-s wPP4 int(5);
+  dcl-s niMv1 int(5);
+  dcl-s niMv2 int(5);
+  dcl-s niMv3 int(5);
+  dcl-s niMv4 int(5);
+  dcl-s niPP1 int(5);
+  dcl-s niPP2 int(5);
+  dcl-s niPP3 int(5);
+  dcl-s niPP4 int(5);
+
+  dcl-s wMvId  int(5);
+  dcl-s wMvNm  char(20);
+  dcl-s wMvTyp int(5);
+  dcl-s wMvPwr int(5);
+  dcl-s wMvAcc int(5);
+  dcl-s wMvPP  int(5);
+  dcl-s wMvPhy char(1);
+  dcl-s niPwr  int(5);
+  dcl-s k int(5);
+  dcl-s mvIds int(5) dim(4);
+  dcl-s mvPPs int(5) dim(4);
+
+  exec sql
+    SELECT bp.PKMN_ID, p.PKMN_NAME, p.TYPE1,
+           p.TYPE2, t1.TYPE_NAME, t2.TYPE_NAME,
+           p.HP, p.ATTACK, p.DEFENSE,
+           p.SP_ATK, p.SP_DEF, p.SPEED,
+           p.BATTLE_CRY, p.ASCII_ART,
+           bp.CURRENT_HP, bp.MAX_HP, bp.LEVEL, bp.TEAM_SLOT,
+           bp.MOVE1, bp.MOVE2, bp.MOVE3, bp.MOVE4,
+           bp.PP1, bp.PP2, bp.PP3, bp.PP4
+      INTO :wId, :wName, :wT1,
+           :wT2 :niT2, :wT1nm, :wT2nm :niT2nm,
+           :wHP, :wAtk, :wDef,
+           :wSpA, :wSpD, :wSpeed,
+           :wCry :niCry, :wArt :niArt,
+           :wCurHP, :wMaxHP, :wLevel, :wTeamSlot,
+           :wMv1 :niMv1, :wMv2 :niMv2,
+           :wMv3 :niMv3, :wMv4 :niMv4,
+           :wPP1 :niPP1, :wPP2 :niPP2,
+           :wPP3 :niPP3, :wPP4 :niPP4
+      FROM NHAGENCO1.BATTLE_POKEMON bp
+      JOIN NHAGENCO1.POKEDEX p ON p.PKMN_ID = bp.PKMN_ID
+      JOIN NHAGENCO1.TYPES t1 ON t1.TYPE_ID = p.TYPE1
+      LEFT JOIN NHAGENCO1.TYPES t2 ON t2.TYPE_ID = p.TYPE2
+     WHERE bp.ROOM_CODE = :room
+       AND bp.PLAYER = :player
+       AND bp.IS_ACTIVE = 'Y';
+
+  if sqlcode <> 0;
+    return *off;
+  endif;
+
+  clear ds;
+  ds.id = wId;
+  ds.name = wName;
+  ds.type1 = wT1;
+  ds.type2 = 0;
+  if niT2 >= 0;
+    ds.type2 = wT2;
+  endif;
+  ds.t1name = wT1nm;
+  ds.t2name = *blanks;
+  if niT2nm >= 0;
+    ds.t2name = wT2nm;
+  endif;
+  ds.cry = *blanks;
+  if niCry >= 0;
+    ds.cry = wCry;
+  endif;
+  ds.art = '';
+  if niArt >= 0;
+    ds.art = wArt;
+  endif;
+  ds.level = wLevel;
+  ds.hp = wCurHP;
+  ds.maxHp = wMaxHP;
+  ds.slot = wTeamSlot;
+
+  ds.atk = (wAtk * 2 * wLevel) / 100 + 5;
+  ds.def = (wDef * 2 * wLevel) / 100 + 5;
+  ds.spAtk = (wSpA * 2 * wLevel) / 100 + 5;
+  ds.spDef = (wSpD * 2 * wLevel) / 100 + 5;
+  ds.speed = (wSpeed * 2 * wLevel) / 100 + 5;
+
+  clear ds.moves;
+  mvIds(1) = 0;
+  mvIds(2) = 0;
+  mvIds(3) = 0;
+  mvIds(4) = 0;
+  mvPPs(1) = 0;
+  mvPPs(2) = 0;
+  mvPPs(3) = 0;
+  mvPPs(4) = 0;
+
+  if niMv1 >= 0;
+    mvIds(1) = wMv1;
+    if niPP1 >= 0;
+      mvPPs(1) = wPP1;
+    endif;
+  endif;
+  if niMv2 >= 0;
+    mvIds(2) = wMv2;
+    if niPP2 >= 0;
+      mvPPs(2) = wPP2;
+    endif;
+  endif;
+  if niMv3 >= 0;
+    mvIds(3) = wMv3;
+    if niPP3 >= 0;
+      mvPPs(3) = wPP3;
+    endif;
+  endif;
+  if niMv4 >= 0;
+    mvIds(4) = wMv4;
+    if niPP4 >= 0;
+      mvPPs(4) = wPP4;
+    endif;
+  endif;
+
+  for k = 1 to 4;
+    if mvIds(k) > 0;
+      wMvId = mvIds(k);
+      exec sql
+        SELECT MOVE_ID, MOVE_NAME, TYPE_ID,
+               POWER, ACCURACY, PP, IS_PHYSICAL
+          INTO :wMvId, :wMvNm, :wMvTyp,
+               :wMvPwr :niPwr, :wMvAcc, :wMvPP, :wMvPhy
+          FROM NHAGENCO1.MOVES
+         WHERE MOVE_ID = :wMvId;
+
+      if sqlcode = 0;
+        ds.moves(k).id = wMvId;
+        ds.moves(k).name = wMvNm;
+        ds.moves(k).typ = wMvTyp;
+        ds.moves(k).power = 0;
+        if niPwr >= 0;
+          ds.moves(k).power = wMvPwr;
+        endif;
+        ds.moves(k).acc = wMvAcc;
+        ds.moves(k).pp = wMvPP;
+        ds.moves(k).curPP = mvPPs(k);
+        ds.moves(k).phys = wMvPhy;
+      endif;
+    endif;
+  endfor;
+
+  return *on;
+end-proc;
+
+// -------------------------------------------------------------
+// SavePkmnState - Write HP and PP back to BATTLE_POKEMON
+// -------------------------------------------------------------
+dcl-proc SavePkmnState;
+  dcl-pi *n;
+    ds     likeds(pkmn_t) const;
+    room   char(8) const;
+    player int(5) const;
+  end-pi;
+
+  dcl-s sHP   int(5);
+  dcl-s sPP1  int(5);
+  dcl-s sPP2  int(5);
+  dcl-s sPP3  int(5);
+  dcl-s sPP4  int(5);
+  dcl-s sSlot int(5);
+  dcl-s sRoom char(8);
+  dcl-s sPlyr int(5);
+
+  sHP = ds.hp;
+  sPP1 = ds.moves(1).curPP;
+  sPP2 = ds.moves(2).curPP;
+  sPP3 = ds.moves(3).curPP;
+  sPP4 = ds.moves(4).curPP;
+  sSlot = ds.slot;
+  sRoom = room;
+  sPlyr = player;
+
+  exec sql
+    UPDATE NHAGENCO1.BATTLE_POKEMON
+       SET CURRENT_HP = :sHP,
+           PP1 = :sPP1,
+           PP2 = :sPP2,
+           PP3 = :sPP3,
+           PP4 = :sPP4
+     WHERE ROOM_CODE = :sRoom
+       AND PLAYER = :sPlyr
+       AND TEAM_SLOT = :sSlot;
+end-proc;
+
+// -------------------------------------------------------------
+// CalcDamage - Gen 1 damage formula
+// Optional pre-rolled randoms for MP determinism
+// -------------------------------------------------------------
+dcl-proc CalcDamage;
+  dcl-pi *n likeds(dmg_t);
+    atk likeds(pkmn_t) const;
+    def likeds(pkmn_t) const;
+    mv  likeds(move_t) const;
+    pAccRoll packed(7:6) const options(*nopass);
+    pCrtRoll packed(7:6) const options(*nopass);
+    pDmgRoll packed(7:6) const options(*nopass);
+  end-pi;
+
+  dcl-ds res likeds(dmg_t) inz;
+  dcl-s atkStat int(5);
+  dcl-s defStat int(5);
+  dcl-s baseDmg packed(9:2);
+  dcl-s stab    packed(3:1);
+  dcl-s tEff    packed(5:2);
+  dcl-s rndFact packed(5:3);
+  dcl-s critChance packed(5:3);
+  dcl-s accRoll packed(7:6);
+  dcl-s critRoll packed(7:6);
+  dcl-s dmgRoll packed(7:6);
+  dcl-s lvl     int(5);
+
+  dcl-s lMvTyp   int(5);
+  dcl-s lMvPwr   int(5);
+  dcl-s lMvAcc   int(5);
+  dcl-s lDefT1   int(5);
+  dcl-s lDefT2   int(5);
+  dcl-s lAtkT1   int(5);
+  dcl-s lAtkT2   int(5);
+  dcl-s lAtkSpd  int(5);
+
+  lMvTyp  = mv.typ;
+  lMvPwr  = mv.power;
+  lMvAcc  = mv.acc;
+  lDefT1  = def.type1;
+  lDefT2  = def.type2;
+  lAtkT1  = atk.type1;
+  lAtkT2  = atk.type2;
+  lAtkSpd = atk.speed;
+
+  res.didHit = *off;
+  res.isCrit = *off;
+  res.damage = 0;
+  res.typeEff = 1;
+
+  // Accuracy check - use pre-rolled or fresh
+  if %parms >= 4;
+    accRoll = pAccRoll;
+  else;
+    exec sql SET :accRoll = RAND();
+  endif;
+  if (accRoll * 100) >= lMvAcc;
+    return res;
+  endif;
+  res.didHit = *on;
+
+  // Type effectiveness lookup
+  exec sql
+    SELECT COALESCE(e1.MULTIPLIER, 1.0) *
+           COALESCE(e2.MULTIPLIER, 1.0)
+      INTO :tEff
+      FROM SYSIBM.SYSDUMMY1
+      LEFT JOIN NHAGENCO1.TYPE_EFFECT e1
+        ON e1.ATK_TYPE = :lMvTyp AND e1.DEF_TYPE = :lDefT1
+      LEFT JOIN NHAGENCO1.TYPE_EFFECT e2
+        ON e2.ATK_TYPE = :lMvTyp AND e2.DEF_TYPE = :lDefT2;
+  res.typeEff = tEff;
+
+  if tEff = 0;
+    return res;
+  endif;
+
+  if mv.phys = 'Y';
+    atkStat = atk.atk;
+    defStat = def.def;
+  else;
+    atkStat = atk.spAtk;
+    defStat = def.spDef;
+  endif;
+
+  lvl = atk.level;
+
+  // Critical hit check
+  if %parms >= 5;
+    critRoll = pCrtRoll;
+  else;
+    exec sql SET :critRoll = RAND();
+  endif;
+  critChance = lAtkSpd / 512;
+  if critRoll < critChance;
+    res.isCrit = *on;
+    lvl = lvl * 2;
+  endif;
+
+  baseDmg = ((2 * lvl / 5 + 2) * lMvPwr * atkStat / defStat)
+            / 50 + 2;
+
+  stab = 1.0;
+  if lMvTyp = lAtkT1 or lMvTyp = lAtkT2;
+    stab = 1.5;
+  endif;
+
+  // Damage roll
+  if %parms >= 6;
+    dmgRoll = pDmgRoll;
+  else;
+    exec sql SET :dmgRoll = RAND();
+  endif;
+  rndFact = (217 + dmgRoll * 38) / 255;
+
+  res.damage = %int(baseDmg * stab * tEff * rndFact);
+  if res.damage < 1 and tEff > 0;
+    res.damage = 1;
+  endif;
+
+  return res;
+end-proc;
+
+// -------------------------------------------------------------
+// BuildHPBar - 20-char visual HP bar
+// -------------------------------------------------------------
+dcl-proc BuildHPBar;
+  dcl-pi *n char(20);
+    curHP int(5) const;
+    maxHP int(5) const;
+  end-pi;
+
+  dcl-s bar char(20);
+  dcl-s filled int(5);
+  dcl-s j int(5);
+
+  if maxHP <= 0;
+    return '....................';
+  endif;
+
+  filled = (curHP * 20) / maxHP;
+  if curHP > 0 and filled = 0;
+    filled = 1;
+  endif;
+
+  bar = *blanks;
+  for j = 1 to 20;
+    if j <= filled;
+      %subst(bar:j:1) = '=';
+    else;
+      %subst(bar:j:1) = '-';
+    endif;
+  endfor;
+
+  return bar;
+end-proc;
+
+// -------------------------------------------------------------
+// ShowMsg - Write narration message and pause
+// -------------------------------------------------------------
+dcl-proc ShowMsg;
+  dcl-pi *n;
+    m1 char(70) const;
+    m2 char(70) const options(*nopass);
+    m3 char(70) const options(*nopass);
+  end-pi;
+
+  MSG1 = m1;
+  if %parms >= 2;
+    MSG2 = m2;
+  else;
+    MSG2 = *blanks;
+  endif;
+  if %parms >= 3;
+    MSG3 = m3;
+  else;
+    MSG3 = *blanks;
+  endif;
+
+  write MSGLINE;
+  QCMDEXC('DLYJOB DLY(2)' : 13);
+end-proc;
+
+// -------------------------------------------------------------
+// ParseArt - Split #-delimited art string into 10 lines
+// -------------------------------------------------------------
+dcl-proc ParseArt;
+  dcl-pi *n;
+    artStr varchar(500) const;
+    l1  char(25);
+    l2  char(25);
+    l3  char(25);
+    l4  char(25);
+    l5  char(25);
+    l6  char(25);
+    l7  char(25);
+    l8  char(25);
+    l9  char(25);
+    l10 char(25);
+  end-pi;
+
+  dcl-s lines char(25) dim(10);
+  dcl-s lineNum int(5);
+  dcl-s startPos int(5);
+  dcl-s pos int(5);
+  dcl-s artLen int(5);
+
+  clear lines;
+  lineNum = 1;
+  startPos = 1;
+  artLen = %len(artStr);
+
+  if artLen = 0;
+    l1 = *blanks;
+    l2 = *blanks;
+    l3 = *blanks;
+    l4 = *blanks;
+    l5 = *blanks;
+    l6 = *blanks;
+    l7 = *blanks;
+    l8 = *blanks;
+    l9 = *blanks;
+    l10 = *blanks;
+    return;
+  endif;
+
+  for pos = 1 to artLen;
+    if %subst(artStr : pos : 1) = '#';
+      if lineNum <= 10;
+        if pos > startPos;
+          lines(lineNum) = %subst(artStr : startPos : pos - startPos);
+        endif;
+        lineNum += 1;
+      endif;
+      startPos = pos + 1;
+    endif;
+  endfor;
+
+  if startPos <= artLen and lineNum <= 10;
+    lines(lineNum) = %subst(artStr : startPos : artLen - startPos + 1);
+  endif;
+
+  l1  = lines(1);
+  l2  = lines(2);
+  l3  = lines(3);
+  l4  = lines(4);
+  l5  = lines(5);
+  l6  = lines(6);
+  l7  = lines(7);
+  l8  = lines(8);
+  l9  = lines(9);
+  l10 = lines(10);
+end-proc;

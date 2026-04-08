@@ -1,0 +1,157 @@
+     A*================================================================
+     A* POKEBATTL - Pokemon Battle Display File
+     A* 27x132 for Mocha 5250
+     A*================================================================
+     A                                      DSPSIZ(27 132)
+     A                                      CA03(03 'F3=Exit')
+     A*
+     A*== HEADER - Row 1 (written first, clears screen) ===========
+     A          R HEADER
+     A                                  1  2'P O K E 4 0 0   B A T T L E'
+     A                                      DSPATR(HI)
+     A            ROOMCD         8A  O  1 55
+     A            BMODE          2A  O  1 65
+     A*
+     A*== OPPONENT - Rows 2-12 ====================================
+     A          R OPPONENT
+     A                                      OVERLAY
+     A                                      PUTOVR
+     A                                      CLRL(*NO)
+     A                                      FRCDTA
+     A                                  2 70'Enemy:'
+     A            OPNAME        12A  O  2 77
+     A                                      OVRDTA
+     A            OPLVL          5A  O  2 90
+     A                                      OVRDTA
+     A            OPTYPE        23A  O  3 70
+     A                                      OVRDTA
+     A                                  4 70'HP:'
+     A            OPHPBR        20A  O  4 74
+     A                                      OVRDTA
+     A            OPCRHP         3S 0O  4 96
+     A                                      OVRDTA
+     A                                  4 99'/'
+     A            OPMXHP         3S 0O  4100
+     A                                      OVRDTA
+     A            OPSTAT        10A  O  5 70
+     A                                      OVRDTA
+     A            OPART1        25A  O  3  5
+     A                                      OVRDTA
+     A            OPART2        25A  O  4  5
+     A                                      OVRDTA
+     A            OPART3        25A  O  5  5
+     A                                      OVRDTA
+     A            OPART4        25A  O  6  5
+     A                                      OVRDTA
+     A            OPART5        25A  O  7  5
+     A                                      OVRDTA
+     A            OPART6        25A  O  8  5
+     A                                      OVRDTA
+     A            OPART7        25A  O  9  5
+     A                                      OVRDTA
+     A            OPART8        25A  O 10  5
+     A                                      OVRDTA
+     A            OPART9        25A  O 11  5
+     A                                      OVRDTA
+     A            OPARTA        25A  O 12  5
+     A                                      OVRDTA
+     A*
+     A*== DIVIDER - Row 13 ========================================
+     A          R DIVIDER
+     A                                      OVERLAY
+     A            DIVLIN       130A  O 13  1
+     A*
+     A*== PLAYER - Rows 14-24 =====================================
+     A          R PLAYER
+     A                                      OVERLAY
+     A                                      PUTOVR
+     A                                      FRCDTA
+     A            PLNAME        12A  O 14  5
+     A                                      OVRDTA
+     A            PLLVL          5A  O 14 18
+     A                                      OVRDTA
+     A            PLTYPE        23A  O 15  5
+     A                                      OVRDTA
+     A                                 16  5'HP:'
+     A            PLHPBR        20A  O 16  9
+     A                                      OVRDTA
+     A            PLCRHP         3S 0O 16 31
+     A                                      OVRDTA
+     A                                 16 34'/'
+     A            PLMXHP         3S 0O 16 35
+     A                                      OVRDTA
+     A            PLSTAT        10A  O 17  5
+     A                                      OVRDTA
+     A            PLART1        25A  O 15 70
+     A                                      OVRDTA
+     A            PLART2        25A  O 16 70
+     A                                      OVRDTA
+     A            PLART3        25A  O 17 70
+     A                                      OVRDTA
+     A            PLART4        25A  O 18 70
+     A                                      OVRDTA
+     A            PLART5        25A  O 19 70
+     A                                      OVRDTA
+     A            PLART6        25A  O 20 70
+     A                                      OVRDTA
+     A            PLART7        25A  O 21 70
+     A                                      OVRDTA
+     A            PLART8        25A  O 22 70
+     A                                      OVRDTA
+     A            PLART9        25A  O 23 70
+     A                                      OVRDTA
+     A            PLARTA        25A  O 24 70
+     A                                      OVRDTA
+     A*
+     A*== MSGLINE - Narration (WRITE + PUTOVR) ====================
+     A          R MSGLINE
+     A                                      OVERLAY
+     A                                      PUTOVR
+     A                                      CLRL(*NO)
+     A                                      FRCDTA
+     A                                      ERASE(MOVEMENU)
+     A                                      ERASE(SWITCHMN)
+     A            MSG1          70A  O 25  5
+     A                                      OVRDTA
+     A            MSG2          70A  O 26  5
+     A                                      OVRDTA
+     A            MSG3          70A  O 27  5
+     A                                      OVRDTA
+     A*
+     A*== MOVEMENU - Move selection (EXFMT) =======================
+     A          R MOVEMENU
+     A                                      OVERLAY
+     A                                      ERASE(MSGLINE)
+     A                                 25  5'What will you do?'
+     A                                      DSPATR(HI)
+     A            MV1NAM        16A  O 26  5
+     A            MV1PP          7A  O 26 23
+     A            MV2NAM        16A  O 26 35
+     A            MV2PP          7A  O 26 53
+     A            MV3NAM        16A  O 27  5
+     A            MV3PP          7A  O 27 23
+     A            MV4NAM        16A  O 27 35
+     A            MV4PP          7A  O 27 53
+     A            MVSEL          1A  B 26 70
+     A                                 26 73'(1-4)'
+     A*
+     A*== SWITCHMN - Switch Pokemon (EXFMT) =======================
+     A          R SWITCHMN
+     A                                      OVERLAY
+     A                                      ERASE(MSGLINE)
+     A                                 25  5'Choose a Pokemon:'
+     A                                      DSPATR(HI)
+     A            SW1NAM        12A  O 26  5
+     A            SW1HP          7A  O 26 19
+     A            SW2NAM        12A  O 26 30
+     A            SW2HP          7A  O 26 44
+     A            SW3NAM        12A  O 26 55
+     A            SW3HP          7A  O 26 69
+     A            SW4NAM        12A  O 27  5
+     A            SW4HP          7A  O 27 19
+     A            SW5NAM        12A  O 27 30
+     A            SW5HP          7A  O 27 44
+     A            SW6NAM        12A  O 27 55
+     A            SW6HP          7A  O 27 69
+     A            SWSEL          1A  B 26 80
+     A                                 26 83'(1-6)'

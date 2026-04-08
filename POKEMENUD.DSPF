@@ -1,0 +1,109 @@
+     A*================================================================
+     A* POKEMENU - Pokemon Battle Menu Display File
+     A* 27x132 for Mocha 5250
+     A*================================================================
+     A                                      DSPSIZ(27 132)
+     A                                      CA03(03 'F3=Exit')
+     A                                      CA12(12 'F12=Back')
+     A*
+     A*== MAINMENU - Title + mode selection ========================
+     A          R MAINMENU
+     A                                  2 45'P O K E 4 0 0'
+     A                                      DSPATR(HI)
+     A                                  4 42'Pokemon Battle Engine'
+     A                                  6 42'on IBM i (pub400.com)'
+     A                                 10 45'1. Single Player'
+     A                                 12 45'2. Multiplayer'
+     A                                 14 45'F3 = Exit'
+     A                                 18 45'Select option:'
+     A            MNSEL          1A  B 18 60
+     A                                 22 35'A Gen 1 Pokemon battle game'
+     A                                 23 35'in SQLRPGLE on a 5250 terminal'
+     A*
+     A*== PKLIST - Pokemon roster list =============================
+     A          R PKLIST
+     A                                  1  2'P O K E 4 0 0'
+     A                                      DSPATR(HI)
+     A            PKTITLE       40A  O  1 30
+     A                                      DSPATR(HI)
+     A                                  3  3'#'
+     A                                      DSPATR(HI)
+     A                                  3  7'NAME'
+     A                                      DSPATR(HI)
+     A                                  3 20'TYPE'
+     A                                      DSPATR(HI)
+     A                                  3 36'HP'
+     A                                      DSPATR(HI)
+     A                                  3 41'ATK'
+     A                                      DSPATR(HI)
+     A                                  3 46'DEF'
+     A                                      DSPATR(HI)
+     A                                  3 51'SPA'
+     A                                      DSPATR(HI)
+     A                                  3 56'SPD'
+     A                                      DSPATR(HI)
+     A                                  3 61'SPE'
+     A                                      DSPATR(HI)
+     A            PK01          66A  O  5  3
+     A            PK02          66A  O  6  3
+     A            PK03          66A  O  7  3
+     A            PK04          66A  O  8  3
+     A            PK05          66A  O  9  3
+     A            PK06          66A  O 10  3
+     A            PK07          66A  O 11  3
+     A            PK08          66A  O 12  3
+     A            PK09          66A  O 13  3
+     A            PK10          66A  O 14  3
+     A            PK11          66A  O 15  3
+     A            PK12          66A  O 16  3
+     A            PK13          66A  O 17  3
+     A            PK14          66A  O 18  3
+     A            PK15          66A  O 19  3
+     A            PK16          66A  O 20  3
+     A            PK17          66A  O 21  3
+     A            PK18          66A  O 22  3
+     A*
+     A*== MPMENU - Multiplayer submenu ==============================
+     A          R MPMENU
+     A                                  2 45'M U L T I P L A Y E R'
+     A                                      DSPATR(HI)
+     A                                 10 45'1. Create Room'
+     A                                 12 45'2. Join Room'
+     A                                 14 45'F3=Exit  F12=Back'
+     A                                 18 45'Select option:'
+     A            MPSEL          1A  B 18 60
+     A            MPMSG         50A  O 20 45
+     A*
+     A*== MPWAIT - Waiting for opponent ==============================
+     A          R MPWAIT
+     A                                  2 45'M U L T I P L A Y E R'
+     A                                      DSPATR(HI)
+     A                                 10 40'Room Code:'
+     A            MPCODE         8A  O 10 52
+     A                                      DSPATR(HI)
+     A                                 12 40'Share this code with your-
+     A                                       opponent!'
+     A                                 16 40'Waiting for opponent to jo-
+     A                                      in...'
+     A            MPWMSG        50A  O 18 40
+     A                                 22 40'F3=Cancel'
+     A*
+     A*== MPJOIN - Join a room =======================================
+     A          R MPJOIN
+     A                                  2 45'M U L T I P L A Y E R'
+     A                                      DSPATR(HI)
+     A                                 10 40'Enter Room Code:'
+     A            MJCODE         8A  B 10 58
+     A                                 14 40'F3=Exit  F12=Back'
+     A            MJMSG         50A  O 16 40
+     A*
+     A*== PKPROMPT - Selection prompt at bottom ====================
+     A          R PKPROMPT
+     A                                      OVERLAY
+     A                                      FRCDTA
+     A            PKTEAM        60A  O 24  3
+     A                                 25  3'Enter # to add (0=done, R=ra-
+     A                                      ndom):'
+     A            PKSEL          2A  B 25 45
+     A            PKMSG         60A  O 26  3
+     A                                 27  3'F3=Exit  F12=Back'
