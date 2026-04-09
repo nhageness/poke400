@@ -58,6 +58,13 @@ dcl-ds pkmn_t qualified template;
   moves   likeds(move_t) dim(4);
   slot    int(5);
   status  char(10);
+  atkStg  int(5);
+  defStg  int(5);
+  spaStg  int(5);
+  spdStg  int(5);
+  speStg  int(5);
+  accStg  int(5);
+  seeded  ind;
 end-ds;
 
 dcl-ds dmg_t qualified template;
@@ -117,6 +124,11 @@ dcl-pr ApplyEndOfTurn;
   isPlayer ind const;
 end-pr;
 
+dcl-pr ApplyStage int(5);
+  baseStat int(5) const;
+  stage    int(5) const;
+end-pr;
+
 dcl-pr LoadActivePkmn ind;
   ds     likeds(pkmn_t);
   room   char(8) const;
@@ -150,6 +162,7 @@ dcl-s plyrAlive int(5);
 dcl-s enmyAlive int(5);
 dcl-s switchOk ind;
 dcl-s plyrFainted ind;
+dcl-s seedDmg int(5);
 dcl-s enmyFainted ind;
 
 // Switch menu work variables
@@ -334,13 +347,26 @@ dow battleOn;
   exsr ResolveTurn;
 
   // -------------------------------------------------------
-  // END-OF-TURN STATUS DAMAGE (burn/poison)
+  // END-OF-TURN EFFECTS (speed order)
   // -------------------------------------------------------
-  if plyr.hp > 0;
-    ApplyEndOfTurn(plyr : *on);
-  endif;
-  if enmy.hp > 0;
-    ApplyEndOfTurn(enmy : *off);
+  if plyr.speed >= enmy.speed;
+    exsr EndOfTurnLeechSeed_Plyr;
+    if plyr.hp > 0;
+      ApplyEndOfTurn(plyr : *on);
+    endif;
+    exsr EndOfTurnLeechSeed_Enmy;
+    if enmy.hp > 0;
+      ApplyEndOfTurn(enmy : *off);
+    endif;
+  else;
+    exsr EndOfTurnLeechSeed_Enmy;
+    if enmy.hp > 0;
+      ApplyEndOfTurn(enmy : *off);
+    endif;
+    exsr EndOfTurnLeechSeed_Plyr;
+    if plyr.hp > 0;
+      ApplyEndOfTurn(plyr : *on);
+    endif;
   endif;
 
   // -------------------------------------------------------
@@ -477,6 +503,64 @@ return;
 // =============================================================
 // SUBROUTINES
 // =============================================================
+
+// --- Leech Seed: drain player, heal enemy ---
+begsr EndOfTurnLeechSeed_Plyr;
+  if plyr.seeded and plyr.hp > 0;
+    seedDmg = plyr.maxHp / 16;
+    if seedDmg < 1;
+      seedDmg = 1;
+    endif;
+    plyr.hp -= seedDmg;
+    if plyr.hp < 0;
+      plyr.hp = 0;
+    endif;
+    ShowMsg(%trim(plyr.name) + '''s health is sapped'
+          + ' by Leech Seed!');
+    PLHPBR = BuildHPBar(plyr.hp : plyr.maxHp);
+    PLCRHP = plyr.hp;
+    write PLAYER;
+    QCMDEXC('DLYJOB DLY(1)' : 13);
+
+    // Heal the other side
+    enmy.hp += seedDmg;
+    if enmy.hp > enmy.maxHp;
+      enmy.hp = enmy.maxHp;
+    endif;
+    OPHPBR = BuildHPBar(enmy.hp : enmy.maxHp);
+    OPCRHP = enmy.hp;
+    write OPPONENT;
+  endif;
+endsr;
+
+// --- Leech Seed: drain enemy, heal player ---
+begsr EndOfTurnLeechSeed_Enmy;
+  if enmy.seeded and enmy.hp > 0;
+    seedDmg = enmy.maxHp / 16;
+    if seedDmg < 1;
+      seedDmg = 1;
+    endif;
+    enmy.hp -= seedDmg;
+    if enmy.hp < 0;
+      enmy.hp = 0;
+    endif;
+    ShowMsg(%trim(enmy.name) + '''s health is sapped'
+          + ' by Leech Seed!');
+    OPHPBR = BuildHPBar(enmy.hp : enmy.maxHp);
+    OPCRHP = enmy.hp;
+    write OPPONENT;
+    QCMDEXC('DLYJOB DLY(1)' : 13);
+
+    // Heal the other side
+    plyr.hp += seedDmg;
+    if plyr.hp > plyr.maxHp;
+      plyr.hp = plyr.maxHp;
+    endif;
+    PLHPBR = BuildHPBar(plyr.hp : plyr.maxHp);
+    PLCRHP = plyr.hp;
+    write PLAYER;
+  endif;
+endsr;
 
 // --- Resolve a turn: both attacks in speed order ---
 begsr ResolveTurn;
@@ -864,6 +948,9 @@ dcl-proc DoAttack;
 
   dcl-ds res likeds(dmg_t) inz;
   dcl-s statusRoll packed(7:6);
+  dcl-s mvEffect char(10);
+  dcl-s healAmt  int(5);
+  dcl-s recoilAmt int(5);
 
   // --- Status check: can this Pokemon act? ---
   if attacker.status = 'PARALYZE';
@@ -883,6 +970,13 @@ dcl-proc DoAttack;
     else;
       attacker.status = 'OK';
       ShowMsg(%trim(attacker.name) + ' woke up!');
+      if isPlayer;
+        PLSTAT = *blanks;
+        write PLAYER;
+      else;
+        OPSTAT = *blanks;
+        write OPPONENT;
+      endif;
     endif;
   endif;
 
@@ -894,6 +988,13 @@ dcl-proc DoAttack;
     else;
       attacker.status = 'OK';
       ShowMsg(%trim(attacker.name) + ' thawed out!');
+      if isPlayer;
+        PLSTAT = *blanks;
+        write PLAYER;
+      else;
+        OPSTAT = *blanks;
+        write OPPONENT;
+      endif;
     endif;
   endif;
 
@@ -903,12 +1004,146 @@ dcl-proc DoAttack;
   ShowMsg(%trim(attacker.name) + ' used '
         + %trim(attacker.moves(moveIdx).name) + '!');
 
-  // Status moves (power = 0) - nothing happens yet
+  mvEffect = attacker.moves(moveIdx).effect;
+
+  // --- Status-only moves (power = 0) ---
   if attacker.moves(moveIdx).power = 0;
-    ShowMsg('But nothing happened!');
+
+    // Accuracy check for status moves
+    exec sql SET :statusRoll = RAND();
+    if (statusRoll * 100) >= attacker.moves(moveIdx).acc;
+      ShowMsg(%trim(attacker.name) + '''s attack missed!');
+      return res;
+    endif;
+    res.didHit = *on;
+
+    select;
+      // Status infliction (Thunder Wave, Sleep Powder, Toxic)
+      when mvEffect = 'PARALYZE'
+        or mvEffect = 'SLEEP'
+        or mvEffect = 'FREEZE';
+        if defender.status = 'OK';
+          defender.status = mvEffect;
+          select;
+            when defender.status = 'BURN';
+              ShowMsg(%trim(defender.name) + ' was burned!');
+            when defender.status = 'POISON';
+              ShowMsg(%trim(defender.name) + ' was poisoned!');
+            when defender.status = 'PARALYZE';
+              ShowMsg(%trim(defender.name) + ' is paralyzed!');
+            when defender.status = 'SLEEP';
+              ShowMsg(%trim(defender.name) + ' fell asleep!');
+            when defender.status = 'FREEZE';
+              ShowMsg(%trim(defender.name) + ' was frozen!');
+          endsl;
+          if isPlayer;
+            OPSTAT = defender.status;
+            write OPPONENT;
+          else;
+            PLSTAT = defender.status;
+            write PLAYER;
+          endif;
+        else;
+          ShowMsg('But it failed!');
+        endif;
+
+      when mvEffect = 'BAD PSN';
+        if defender.status = 'OK';
+          defender.status = 'POISON';
+          ShowMsg(%trim(defender.name) + ' was badly poisoned!');
+          if isPlayer;
+            OPSTAT = 'POISON';
+            write OPPONENT;
+          else;
+            PLSTAT = 'POISON';
+            write PLAYER;
+          endif;
+        else;
+          ShowMsg('But it failed!');
+        endif;
+
+      // Stat boosts (Withdraw = DEF UP)
+      when mvEffect = 'DEF UP';
+        if attacker.defStg < 6;
+          attacker.defStg += 1;
+          ShowMsg(%trim(attacker.name) + '''s defense rose!');
+        else;
+          ShowMsg(%trim(attacker.name) + '''s defense won''t go higher!');
+        endif;
+
+      // Stat drops on opponent
+      when mvEffect = 'ACC DOWN';
+        if defender.accStg > -6;
+          defender.accStg -= 1;
+          ShowMsg(%trim(defender.name) + '''s accuracy fell!');
+        else;
+          ShowMsg(%trim(defender.name) + '''s accuracy won''t go lower!');
+        endif;
+
+      when mvEffect = 'SPD DOWN';
+        if defender.speStg > -6;
+          defender.speStg -= 1;
+          ShowMsg(%trim(defender.name) + '''s speed fell!');
+        else;
+          ShowMsg(%trim(defender.name) + '''s speed won''t go lower!');
+        endif;
+
+      // Fixed damage moves with no power
+      when mvEffect = 'FIXED DMG';
+        // Seismic Toss / Night Shade: damage = attacker level
+        res.damage = attacker.level;
+        res.typeEff = 1;
+        defender.hp -= res.damage;
+        if defender.hp < 0;
+          defender.hp = 0;
+        endif;
+        if isPlayer;
+      OPHPBR = BuildHPBar(defender.hp : defender.maxHp);
+      OPCRHP = defender.hp;
+      write OPPONENT;
+    else;
+      PLHPBR = BuildHPBar(defender.hp : defender.maxHp);
+      PLCRHP = defender.hp;
+      write PLAYER;
+    endif;
+    QCMDEXC('DLYJOB DLY(1)' : 13);
+
+      when mvEffect = 'FIXED 40';
+        // Dragon Rage: always 40
+        res.damage = 40;
+        res.typeEff = 1;
+        defender.hp -= res.damage;
+        if defender.hp < 0;
+          defender.hp = 0;
+        endif;
+        if isPlayer;
+      OPHPBR = BuildHPBar(defender.hp : defender.maxHp);
+      OPCRHP = defender.hp;
+      write OPPONENT;
+    else;
+      PLHPBR = BuildHPBar(defender.hp : defender.maxHp);
+      PLCRHP = defender.hp;
+      write PLAYER;
+    endif;
+    QCMDEXC('DLYJOB DLY(1)' : 13);
+
+      when mvEffect = 'DRAIN';
+        // Leech Seed: seed the defender
+        if not defender.seeded;
+          defender.seeded = *on;
+          ShowMsg(%trim(defender.name) + ' was seeded!');
+        else;
+          ShowMsg('But it failed!');
+        endif;
+
+      other;
+        ShowMsg('But nothing happened!');
+    endsl;
+
     return res;
   endif;
 
+  // --- Damaging moves ---
   res = CalcDamage(attacker : defender : attacker.moves(moveIdx)
                   : accRoll : crtRoll : dmgRoll);
 
@@ -928,7 +1163,6 @@ dcl-proc DoAttack;
     defender.hp = 0;
   endif;
 
-  // Refresh the correct side's display
   if isPlayer;
     OPHPBR = BuildHPBar(defender.hp : defender.maxHp);
     OPCRHP = defender.hp;
@@ -949,24 +1183,90 @@ dcl-proc DoAttack;
     ShowMsg('It''s not very effective...');
   endif;
 
-  // --- Apply status effect from move ---
-  if res.didHit and defender.hp > 0
-     and defender.status = 'OK'
-     and attacker.moves(moveIdx).effect <> *blanks
-     and attacker.moves(moveIdx).effPct > 0;
+  // --- Post-damage effects ---
 
-    // Only apply primary status effects here
+  // Recoil (Submission: 1/4 damage dealt)
+  if mvEffect = 'RECOIL' and res.damage > 0;
+    recoilAmt = res.damage / 4;
+    if recoilAmt < 1;
+      recoilAmt = 1;
+    endif;
+    attacker.hp -= recoilAmt;
+    if attacker.hp < 0;
+      attacker.hp = 0;
+    endif;
+    ShowMsg(%trim(attacker.name) + ' is hit with recoil!');
+    if isPlayer;
+      PLHPBR = BuildHPBar(attacker.hp : attacker.maxHp);
+      PLCRHP = attacker.hp;
+      write PLAYER;
+    else;
+      OPHPBR = BuildHPBar(attacker.hp : attacker.maxHp);
+      OPCRHP = attacker.hp;
+      write OPPONENT;
+    endif;
+    QCMDEXC('DLYJOB DLY(1)' : 13);
+  endif;
+
+  // Drain (Dream Eater: heal 1/2 damage dealt)
+  if mvEffect = 'DRAIN' and res.damage > 0
+     and defender.hp >= 0;
+    healAmt = res.damage / 2;
+    if healAmt < 1;
+      healAmt = 1;
+    endif;
+    attacker.hp += healAmt;
+    if attacker.hp > attacker.maxHp;
+      attacker.hp = attacker.maxHp;
+    endif;
+    ShowMsg(%trim(attacker.name) + ' drained energy!');
+    if isPlayer;
+      PLHPBR = BuildHPBar(attacker.hp : attacker.maxHp);
+      PLCRHP = attacker.hp;
+      write PLAYER;
+    else;
+      OPHPBR = BuildHPBar(attacker.hp : attacker.maxHp);
+      OPCRHP = attacker.hp;
+      write OPPONENT;
+    endif;
+    QCMDEXC('DLYJOB DLY(1)' : 13);
+  endif;
+
+  // Stat drops from damaging moves (Psychic = SPDEF DN, Bubble Beam = SPD DOWN)
+  if defender.hp > 0;
     select;
-      when attacker.moves(moveIdx).effect = 'BURN'
-        or attacker.moves(moveIdx).effect = 'POISON'
-        or attacker.moves(moveIdx).effect = 'PARALYZE'
-        or attacker.moves(moveIdx).effect = 'SLEEP'
-        or attacker.moves(moveIdx).effect = 'FREEZE';
+      when mvEffect = 'SPDEF DN';
+        exec sql SET :statusRoll = RAND();
+        if statusRoll * 100 < attacker.moves(moveIdx).effPct;
+          if defender.spdStg > -6;
+            defender.spdStg -= 1;
+            ShowMsg(%trim(defender.name) + '''s sp. defense fell!');
+          endif;
+        endif;
+
+      when mvEffect = 'SPD DOWN';
+        exec sql SET :statusRoll = RAND();
+        if statusRoll * 100 < attacker.moves(moveIdx).effPct;
+          if defender.speStg > -6;
+            defender.speStg -= 1;
+            ShowMsg(%trim(defender.name) + '''s speed fell!');
+          endif;
+        endif;
+    endsl;
+  endif;
+
+  // Status effects from damaging moves (Ember burn, Thunderbolt paralyze, etc.)
+  if defender.hp > 0 and defender.status = 'OK';
+    select;
+      when mvEffect = 'BURN'
+        or mvEffect = 'POISON'
+        or mvEffect = 'PARALYZE'
+        or mvEffect = 'SLEEP'
+        or mvEffect = 'FREEZE';
 
         exec sql SET :statusRoll = RAND();
         if statusRoll * 100 < attacker.moves(moveIdx).effPct;
-          defender.status = attacker.moves(moveIdx).effect;
-
+          defender.status = mvEffect;
           select;
             when defender.status = 'BURN';
               ShowMsg(%trim(defender.name) + ' was burned!');
@@ -979,8 +1279,6 @@ dcl-proc DoAttack;
             when defender.status = 'FREEZE';
               ShowMsg(%trim(defender.name) + ' was frozen!');
           endsl;
-
-          // Update status on display
           if isPlayer;
             OPSTAT = defender.status;
             write OPPONENT;
@@ -1389,9 +1687,27 @@ dcl-proc CalcDamage;
     exec sql SET :critRoll = RAND();
   endif;
   critChance = lAtkSpd / 512;
+  // HIGH CRIT moves double the crit chance
+  if mv.effect = 'HIGH CRIT';
+    critChance = critChance * 2;
+    if critChance > 1;
+      critChance = 1;
+    endif;
+  endif;
   if critRoll < critChance;
     res.isCrit = *on;
     lvl = lvl * 2;
+  endif;
+
+  // Apply stat stages (ignored on crits per Gen 1)
+  if not res.isCrit;
+    if mv.phys = 'Y';
+      atkStat = ApplyStage(atkStat : atk.atkStg);
+      defStat = ApplyStage(defStat : def.defStg);
+    else;
+      atkStat = ApplyStage(atkStat : atk.spaStg);
+      defStat = ApplyStage(defStat : def.spdStg);
+    endif;
   endif;
 
   baseDmg = ((2 * lvl / 5 + 2) * lMvPwr * atkStat / defStat)
@@ -1416,6 +1732,35 @@ dcl-proc CalcDamage;
   endif;
 
   return res;
+end-proc;
+
+// -------------------------------------------------------------
+// ApplyStage - Apply stat stage multiplier (-6 to +6)
+// Gen 1: stages 2/2, 3/2, 4/2, 5/2, 6/2, 7/2, 8/2
+//        and inverse for negatives
+// -------------------------------------------------------------
+dcl-proc ApplyStage;
+  dcl-pi *n int(5);
+    baseStat int(5) const;
+    stage    int(5) const;
+  end-pi;
+
+  dcl-s num int(5);
+  dcl-s den int(5);
+
+  if stage = 0;
+    return baseStat;
+  endif;
+
+  if stage > 0;
+    num = 2 + stage;
+    den = 2;
+  else;
+    num = 2;
+    den = 2 - stage;
+  endif;
+
+  return baseStat * num / den;
 end-proc;
 
 // -------------------------------------------------------------
