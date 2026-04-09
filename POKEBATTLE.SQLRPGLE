@@ -34,6 +34,8 @@ dcl-ds move_t qualified template;
   pp    int(5);
   curPP int(5);
   phys  char(1);
+  effect  char(10);
+  effPct  int(5);
 end-ds;
 
 dcl-ds pkmn_t qualified template;
@@ -55,6 +57,7 @@ dcl-ds pkmn_t qualified template;
   art     varchar(500);
   moves   likeds(move_t) dim(4);
   slot    int(5);
+  status  char(10);
 end-ds;
 
 dcl-ds dmg_t qualified template;
@@ -107,6 +110,11 @@ dcl-pr DoAttack likeds(dmg_t);
   accRoll   packed(7:6) const;
   crtRoll   packed(7:6) const;
   dmgRoll   packed(7:6) const;
+end-pr;
+
+dcl-pr ApplyEndOfTurn;
+  pkmn     likeds(pkmn_t);
+  isPlayer ind const;
 end-pr;
 
 dcl-pr LoadActivePkmn ind;
@@ -324,6 +332,16 @@ dow battleOn;
   endif;
 
   exsr ResolveTurn;
+
+  // -------------------------------------------------------
+  // END-OF-TURN STATUS DAMAGE (burn/poison)
+  // -------------------------------------------------------
+  if plyr.hp > 0;
+    ApplyEndOfTurn(plyr : *on);
+  endif;
+  if enmy.hp > 0;
+    ApplyEndOfTurn(enmy : *off);
+  endif;
 
   // -------------------------------------------------------
   // FAINT CHECKING (handles simultaneous faints)
@@ -614,7 +632,11 @@ begsr RefreshEnemy;
   OPHPBR = BuildHPBar(enmy.hp : enmy.maxHp);
   OPCRHP = enmy.hp;
   OPMXHP = enmy.maxHp;
-  OPSTAT = *blanks;
+  if enmy.status <> 'OK' and enmy.status <> *blanks;
+    OPSTAT = enmy.status;
+  else;
+    OPSTAT = *blanks;
+  endif;
   ParseArt(enmy.art : OPART1 : OPART2 : OPART3 : OPART4 : OPART5
                      : OPART6 : OPART7 : OPART8 : OPART9 : OPARTA);
   write OPPONENT;
@@ -632,7 +654,11 @@ begsr RefreshPlayer;
   PLHPBR = BuildHPBar(plyr.hp : plyr.maxHp);
   PLCRHP = plyr.hp;
   PLMXHP = plyr.maxHp;
-  PLSTAT = *blanks;
+  if plyr.status <> 'OK' and plyr.status <> *blanks;
+    PLSTAT = plyr.status;
+  else;
+    PLSTAT = *blanks;
+  endif;
   ParseArt(plyr.art : PLART1 : PLART2 : PLART3 : PLART4 : PLART5
                      : PLART6 : PLART7 : PLART8 : PLART9 : PLARTA);
   write PLAYER;
@@ -837,6 +863,39 @@ dcl-proc DoAttack;
   end-pi;
 
   dcl-ds res likeds(dmg_t) inz;
+  dcl-s statusRoll packed(7:6);
+
+  // --- Status check: can this Pokemon act? ---
+  if attacker.status = 'PARALYZE';
+    exec sql SET :statusRoll = RAND();
+    if statusRoll < 0.25;
+      ShowMsg(%trim(attacker.name) + ' is paralyzed!'
+            + ' It can''t move!');
+      return res;
+    endif;
+  endif;
+
+  if attacker.status = 'SLEEP';
+    exec sql SET :statusRoll = RAND();
+    if statusRoll < 0.667;
+      ShowMsg(%trim(attacker.name) + ' is fast asleep!');
+      return res;
+    else;
+      attacker.status = 'OK';
+      ShowMsg(%trim(attacker.name) + ' woke up!');
+    endif;
+  endif;
+
+  if attacker.status = 'FREEZE';
+    exec sql SET :statusRoll = RAND();
+    if statusRoll < 0.90;
+      ShowMsg(%trim(attacker.name) + ' is frozen solid!');
+      return res;
+    else;
+      attacker.status = 'OK';
+      ShowMsg(%trim(attacker.name) + ' thawed out!');
+    endif;
+  endif;
 
   // Decrement PP
   attacker.moves(moveIdx).curPP -= 1;
@@ -890,7 +949,99 @@ dcl-proc DoAttack;
     ShowMsg('It''s not very effective...');
   endif;
 
+  // --- Apply status effect from move ---
+  if res.didHit and defender.hp > 0
+     and defender.status = 'OK'
+     and attacker.moves(moveIdx).effect <> *blanks
+     and attacker.moves(moveIdx).effPct > 0;
+
+    // Only apply primary status effects here
+    select;
+      when attacker.moves(moveIdx).effect = 'BURN'
+        or attacker.moves(moveIdx).effect = 'POISON'
+        or attacker.moves(moveIdx).effect = 'PARALYZE'
+        or attacker.moves(moveIdx).effect = 'SLEEP'
+        or attacker.moves(moveIdx).effect = 'FREEZE';
+
+        exec sql SET :statusRoll = RAND();
+        if statusRoll * 100 < attacker.moves(moveIdx).effPct;
+          defender.status = attacker.moves(moveIdx).effect;
+
+          select;
+            when defender.status = 'BURN';
+              ShowMsg(%trim(defender.name) + ' was burned!');
+            when defender.status = 'POISON';
+              ShowMsg(%trim(defender.name) + ' was poisoned!');
+            when defender.status = 'PARALYZE';
+              ShowMsg(%trim(defender.name) + ' is paralyzed!');
+            when defender.status = 'SLEEP';
+              ShowMsg(%trim(defender.name) + ' fell asleep!');
+            when defender.status = 'FREEZE';
+              ShowMsg(%trim(defender.name) + ' was frozen!');
+          endsl;
+
+          // Update status on display
+          if isPlayer;
+            OPSTAT = defender.status;
+            write OPPONENT;
+          else;
+            PLSTAT = defender.status;
+            write PLAYER;
+          endif;
+        endif;
+    endsl;
+  endif;
+
   return res;
+end-proc;
+
+// -------------------------------------------------------------
+// ApplyEndOfTurn - Burn/poison damage at end of turn
+// -------------------------------------------------------------
+dcl-proc ApplyEndOfTurn;
+  dcl-pi *n;
+    pkmn     likeds(pkmn_t);
+    isPlayer ind const;
+  end-pi;
+
+  dcl-s tickDmg int(5);
+
+  if pkmn.status <> 'BURN' and pkmn.status <> 'POISON';
+    return;
+  endif;
+
+  if pkmn.hp <= 0;
+    return;
+  endif;
+
+  // 1/16 of max HP per turn
+  tickDmg = pkmn.maxHp / 16;
+  if tickDmg < 1;
+    tickDmg = 1;
+  endif;
+
+  pkmn.hp -= tickDmg;
+  if pkmn.hp < 0;
+    pkmn.hp = 0;
+  endif;
+
+  if pkmn.status = 'BURN';
+    ShowMsg(%trim(pkmn.name) + ' is hurt by its burn!');
+  else;
+    ShowMsg(%trim(pkmn.name) + ' is hurt by poison!');
+  endif;
+
+  // Refresh display
+  if isPlayer;
+    PLHPBR = BuildHPBar(pkmn.hp : pkmn.maxHp);
+    PLCRHP = pkmn.hp;
+    write PLAYER;
+  else;
+    OPHPBR = BuildHPBar(pkmn.hp : pkmn.maxHp);
+    OPCRHP = pkmn.hp;
+    write OPPONENT;
+  endif;
+  QCMDEXC('DLYJOB DLY(1)' : 13);
 end-proc;
 
 // -------------------------------------------------------------
@@ -950,10 +1101,15 @@ dcl-proc LoadActivePkmn;
   dcl-s wMvAcc int(5);
   dcl-s wMvPP  int(5);
   dcl-s wMvPhy char(1);
+  dcl-s wMvEff char(10);
+  dcl-s wMvEPct int(5);
   dcl-s niPwr  int(5);
+  dcl-s niEff  int(5);
+  dcl-s niEPct int(5);
   dcl-s k int(5);
   dcl-s mvIds int(5) dim(4);
   dcl-s mvPPs int(5) dim(4);
+  dcl-s wStatus char(10);
 
   exec sql
     SELECT bp.PKMN_ID, p.PKMN_NAME, p.TYPE1,
@@ -963,7 +1119,8 @@ dcl-proc LoadActivePkmn;
            p.BATTLE_CRY, p.ASCII_ART,
            bp.CURRENT_HP, bp.MAX_HP, bp.LEVEL, bp.TEAM_SLOT,
            bp.MOVE1, bp.MOVE2, bp.MOVE3, bp.MOVE4,
-           bp.PP1, bp.PP2, bp.PP3, bp.PP4
+           bp.PP1, bp.PP2, bp.PP3, bp.PP4,
+           bp.STATUS
       INTO :wId, :wName, :wT1,
            :wT2 :niT2, :wT1nm, :wT2nm :niT2nm,
            :wHP, :wAtk, :wDef,
@@ -973,7 +1130,8 @@ dcl-proc LoadActivePkmn;
            :wMv1 :niMv1, :wMv2 :niMv2,
            :wMv3 :niMv3, :wMv4 :niMv4,
            :wPP1 :niPP1, :wPP2 :niPP2,
-           :wPP3 :niPP3, :wPP4 :niPP4
+           :wPP3 :niPP3, :wPP4 :niPP4,
+           :wStatus
       FROM NHAGENCO1.BATTLE_POKEMON bp
       JOIN NHAGENCO1.POKEDEX p ON p.PKMN_ID = bp.PKMN_ID
       JOIN NHAGENCO1.TYPES t1 ON t1.TYPE_ID = p.TYPE1
@@ -1011,6 +1169,7 @@ dcl-proc LoadActivePkmn;
   ds.hp = wCurHP;
   ds.maxHp = wMaxHP;
   ds.slot = wTeamSlot;
+  ds.status = wStatus;
 
   ds.atk = (wAtk * 2 * wLevel) / 100 + 5;
   ds.def = (wDef * 2 * wLevel) / 100 + 5;
@@ -1058,9 +1217,11 @@ dcl-proc LoadActivePkmn;
       wMvId = mvIds(k);
       exec sql
         SELECT MOVE_ID, MOVE_NAME, TYPE_ID,
-               POWER, ACCURACY, PP, IS_PHYSICAL
+               POWER, ACCURACY, PP, IS_PHYSICAL,
+               EFFECT, EFFECT_PCT
           INTO :wMvId, :wMvNm, :wMvTyp,
-               :wMvPwr :niPwr, :wMvAcc, :wMvPP, :wMvPhy
+               :wMvPwr :niPwr, :wMvAcc, :wMvPP, :wMvPhy,
+               :wMvEff :niEff, :wMvEPct :niEPct
           FROM NHAGENCO1.MOVES
          WHERE MOVE_ID = :wMvId;
 
@@ -1076,6 +1237,14 @@ dcl-proc LoadActivePkmn;
         ds.moves(k).pp = wMvPP;
         ds.moves(k).curPP = mvPPs(k);
         ds.moves(k).phys = wMvPhy;
+        ds.moves(k).effect = *blanks;
+        if niEff >= 0;
+          ds.moves(k).effect = wMvEff;
+        endif;
+        ds.moves(k).effPct = 0;
+        if niEPct >= 0;
+          ds.moves(k).effPct = wMvEPct;
+        endif;
       endif;
     endif;
   endfor;
@@ -1101,6 +1270,7 @@ dcl-proc SavePkmnState;
   dcl-s sSlot int(5);
   dcl-s sRoom char(8);
   dcl-s sPlyr int(5);
+  dcl-s sStat char(10);
 
   sHP = ds.hp;
   sPP1 = ds.moves(1).curPP;
@@ -1110,6 +1280,7 @@ dcl-proc SavePkmnState;
   sSlot = ds.slot;
   sRoom = room;
   sPlyr = player;
+  sStat = ds.status;
 
   exec sql
     UPDATE NHAGENCO1.BATTLE_POKEMON
@@ -1117,7 +1288,8 @@ dcl-proc SavePkmnState;
            PP1 = :sPP1,
            PP2 = :sPP2,
            PP3 = :sPP3,
-           PP4 = :sPP4
+           PP4 = :sPP4,
+           STATUS = :sStat
      WHERE ROOM_CODE = :sRoom
        AND PLAYER = :sPlyr
        AND TEAM_SLOT = :sSlot;
