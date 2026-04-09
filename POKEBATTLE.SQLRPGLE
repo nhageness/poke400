@@ -65,6 +65,7 @@ dcl-ds pkmn_t qualified template;
   speStg  int(5);
   accStg  int(5);
   seeded  ind;
+  baseSpd int(5);
 end-ds;
 
 dcl-ds dmg_t qualified template;
@@ -321,11 +322,18 @@ dow battleOn;
     endfor;
     enmyMoveIdx = aiMoveIdx;
 
-    // Determine turn order
-    if plyr.speed >= enmy.speed;
+    // Determine turn order (random on tie)
+    if plyr.speed > enmy.speed;
       firstAtk = pPlayer;
-    else;
+    elseif plyr.speed < enmy.speed;
       firstAtk = enmyPlayer;
+    else;
+      exec sql SET :randVal = RAND();
+      if randVal < 0.5;
+        firstAtk = pPlayer;
+      else;
+        firstAtk = enmyPlayer;
+      endif;
     endif;
 
     // Generate randoms for both sides
@@ -347,9 +355,9 @@ dow battleOn;
   exsr ResolveTurn;
 
   // -------------------------------------------------------
-  // END-OF-TURN EFFECTS (speed order)
+  // END-OF-TURN EFFECTS (same speed order as attacks)
   // -------------------------------------------------------
-  if plyr.speed >= enmy.speed;
+  if firstAtk = pPlayer;
     exsr EndOfTurnLeechSeed_Plyr;
     if plyr.hp > 0;
       ApplyEndOfTurn(plyr : *on);
@@ -652,10 +660,17 @@ begsr MPExchangeMoves;
     exec sql SET :p2Dmg = RAND();
 
     // Speed order (P1's perspective: plyr=P1, enmy=P2)
-    if plyr.speed >= enmy.speed;
+    if plyr.speed > enmy.speed;
       firstAtk = 1;
-    else;
+    elseif plyr.speed < enmy.speed;
       firstAtk = 2;
+    else;
+      exec sql SET :randVal = RAND();
+      if randVal < 0.5;
+        firstAtk = 1;
+      else;
+        firstAtk = 2;
+      endif;
     endif;
 
     exec sql
@@ -1474,6 +1489,7 @@ dcl-proc LoadActivePkmn;
   ds.spAtk = (wSpA * 2 * wLevel) / 100 + 5;
   ds.spDef = (wSpD * 2 * wLevel) / 100 + 5;
   ds.speed = (wSpeed * 2 * wLevel) / 100 + 5;
+  ds.baseSpd = wSpeed;
 
   clear ds.moves;
   mvIds(1) = 0;
@@ -1636,7 +1652,7 @@ dcl-proc CalcDamage;
   lDefT2  = def.type2;
   lAtkT1  = atk.type1;
   lAtkT2  = atk.type2;
-  lAtkSpd = atk.speed;
+  lAtkSpd = atk.baseSpd;
 
   res.didHit = *off;
   res.isCrit = *off;
