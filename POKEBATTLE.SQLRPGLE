@@ -99,6 +99,16 @@ dcl-pr ParseArt;
   l10 char(25);
 end-pr;
 
+dcl-pr DoAttack likeds(dmg_t);
+  attacker  likeds(pkmn_t);
+  defender  likeds(pkmn_t);
+  moveIdx   int(5) const;
+  isPlayer  ind const;
+  accRoll   packed(7:6) const;
+  crtRoll   packed(7:6) const;
+  dmgRoll   packed(7:6) const;
+end-pr;
+
 dcl-pr LoadActivePkmn ind;
   ds     likeds(pkmn_t);
   room   char(8) const;
@@ -297,17 +307,23 @@ dow battleOn;
       firstAtk = enmyPlayer;
     endif;
 
-    // SP: calc damage with fresh randoms
-    exsr ResolveTurn;
+    // Generate randoms for both sides
+    exec sql SET :myAcc = RAND();
+    exec sql SET :myCrt = RAND();
+    exec sql SET :myDmg = RAND();
+    exec sql SET :opAcc = RAND();
+    exec sql SET :opCrt = RAND();
+    exec sql SET :opDmg = RAND();
 
   else;
-    // MP: write our move, wait for opponent, then resolve
+    // MP: write our move, wait for opponent, get shared randoms
     exsr MPExchangeMoves;
     if not battleOn;
       leave;
     endif;
-    exsr ResolveTurn;
   endif;
+
+  exsr ResolveTurn;
 
   // -------------------------------------------------------
   // FAINT CHECKING (handles simultaneous faints)
@@ -446,31 +462,19 @@ return;
 
 // --- Resolve a turn: both attacks in speed order ---
 begsr ResolveTurn;
-  if battleMode = 'SP';
-    // SP: use fresh randoms from CalcDamage
-    if firstAtk = pPlayer;
-      exsr DoPlayerAttack;
-      if enmy.hp > 0 and battleOn;
-        exsr DoEnemyAttack;
-      endif;
-    else;
-      exsr DoEnemyAttack;
-      if plyr.hp > 0 and battleOn;
-        exsr DoPlayerAttack;
-      endif;
+  if firstAtk = pPlayer;
+    result = DoAttack(plyr : enmy : moveChoice : *on
+                     : myAcc : myCrt : myDmg);
+    if enmy.hp > 0;
+      result2 = DoAttack(enmy : plyr : enmyMoveIdx : *off
+                        : opAcc : opCrt : opDmg);
     endif;
   else;
-    // MP: use shared randoms
-    if firstAtk = pPlayer;
-      exsr DoPlayerAttackMP;
-      if enmy.hp > 0;
-        exsr DoEnemyAttackMP;
-      endif;
-    else;
-      exsr DoEnemyAttackMP;
-      if plyr.hp > 0;
-        exsr DoPlayerAttackMP;
-      endif;
+    result2 = DoAttack(enmy : plyr : enmyMoveIdx : *off
+                      : opAcc : opCrt : opDmg);
+    if plyr.hp > 0;
+      result = DoAttack(plyr : enmy : moveChoice : *on
+                       : myAcc : myCrt : myDmg);
     endif;
   endif;
 endsr;
@@ -634,179 +638,6 @@ begsr RefreshPlayer;
   write PLAYER;
 endsr;
 
-// --- SP: Player attacks enemy (fresh randoms) ---
-begsr DoPlayerAttack;
-  plyr.moves(moveChoice).curPP -= 1;
-
-  ShowMsg(%trim(plyr.name) + ' used '
-        + %trim(plyr.moves(moveChoice).name) + '!');
-
-  if plyr.moves(moveChoice).power = 0;
-    ShowMsg('But nothing happened!');
-    leavesr;
-  endif;
-
-  result = CalcDamage(plyr : enmy : plyr.moves(moveChoice));
-
-  if not result.didHit;
-    ShowMsg(%trim(plyr.name) + '''s attack missed!');
-    leavesr;
-  endif;
-
-  if result.typeEff = 0;
-    ShowMsg('It doesn''t affect ' + %trim(enmy.name) + '...');
-    leavesr;
-  endif;
-
-  enmy.hp -= result.damage;
-  if enmy.hp < 0;
-    enmy.hp = 0;
-  endif;
-  OPHPBR = BuildHPBar(enmy.hp : enmy.maxHp);
-  OPCRHP = enmy.hp;
-  write OPPONENT;
-  QCMDEXC('DLYJOB DLY(1)' : 13);
-
-  if result.isCrit;
-    ShowMsg('A critical hit!');
-  endif;
-  if result.typeEff > 1;
-    ShowMsg('It''s super effective!');
-  elseif result.typeEff < 1;
-    ShowMsg('It''s not very effective...');
-  endif;
-endsr;
-
-// --- SP: Enemy attacks player (fresh randoms) ---
-begsr DoEnemyAttack;
-  enmy.moves(enmyMoveIdx).curPP -= 1;
-
-  ShowMsg(%trim(enmy.name) + ' used '
-        + %trim(enmy.moves(enmyMoveIdx).name) + '!');
-
-  if enmy.moves(enmyMoveIdx).power = 0;
-    ShowMsg('But nothing happened!');
-    leavesr;
-  endif;
-
-  result = CalcDamage(enmy : plyr : enmy.moves(enmyMoveIdx));
-
-  if not result.didHit;
-    ShowMsg(%trim(enmy.name) + '''s attack missed!');
-    leavesr;
-  endif;
-
-  if result.typeEff = 0;
-    ShowMsg('It doesn''t affect ' + %trim(plyr.name) + '...');
-    leavesr;
-  endif;
-
-  plyr.hp -= result.damage;
-  if plyr.hp < 0;
-    plyr.hp = 0;
-  endif;
-  PLHPBR = BuildHPBar(plyr.hp : plyr.maxHp);
-  PLCRHP = plyr.hp;
-  write PLAYER;
-  QCMDEXC('DLYJOB DLY(1)' : 13);
-
-  if result.isCrit;
-    ShowMsg('A critical hit!');
-  endif;
-  if result.typeEff > 1;
-    ShowMsg('It''s super effective!');
-  elseif result.typeEff < 1;
-    ShowMsg('It''s not very effective...');
-  endif;
-endsr;
-
-// --- MP: Player attacks with shared randoms ---
-begsr DoPlayerAttackMP;
-  plyr.moves(moveChoice).curPP -= 1;
-
-  ShowMsg(%trim(plyr.name) + ' used '
-        + %trim(plyr.moves(moveChoice).name) + '!');
-
-  if plyr.moves(moveChoice).power = 0;
-    ShowMsg('But nothing happened!');
-    leavesr;
-  endif;
-
-  result = CalcDamage(plyr : enmy : plyr.moves(moveChoice)
-                     : myAcc : myCrt : myDmg);
-
-  if not result.didHit;
-    ShowMsg(%trim(plyr.name) + '''s attack missed!');
-    leavesr;
-  endif;
-
-  if result.typeEff = 0;
-    ShowMsg('It doesn''t affect ' + %trim(enmy.name) + '...');
-    leavesr;
-  endif;
-
-  enmy.hp -= result.damage;
-  if enmy.hp < 0;
-    enmy.hp = 0;
-  endif;
-  OPHPBR = BuildHPBar(enmy.hp : enmy.maxHp);
-  OPCRHP = enmy.hp;
-  write OPPONENT;
-  QCMDEXC('DLYJOB DLY(1)' : 13);
-
-  if result.isCrit;
-    ShowMsg('A critical hit!');
-  endif;
-  if result.typeEff > 1;
-    ShowMsg('It''s super effective!');
-  elseif result.typeEff < 1;
-    ShowMsg('It''s not very effective...');
-  endif;
-endsr;
-
-// --- MP: Enemy attacks with shared randoms ---
-begsr DoEnemyAttackMP;
-  enmy.moves(enmyMoveIdx).curPP -= 1;
-
-  ShowMsg(%trim(enmy.name) + ' used '
-        + %trim(enmy.moves(enmyMoveIdx).name) + '!');
-
-  if enmy.moves(enmyMoveIdx).power = 0;
-    ShowMsg('But nothing happened!');
-    leavesr;
-  endif;
-
-  result = CalcDamage(enmy : plyr : enmy.moves(enmyMoveIdx)
-                     : opAcc : opCrt : opDmg);
-
-  if not result.didHit;
-    ShowMsg(%trim(enmy.name) + '''s attack missed!');
-    leavesr;
-  endif;
-
-  if result.typeEff = 0;
-    ShowMsg('It doesn''t affect ' + %trim(plyr.name) + '...');
-    leavesr;
-  endif;
-
-  plyr.hp -= result.damage;
-  if plyr.hp < 0;
-    plyr.hp = 0;
-  endif;
-  PLHPBR = BuildHPBar(plyr.hp : plyr.maxHp);
-  PLCRHP = plyr.hp;
-  write PLAYER;
-  QCMDEXC('DLYJOB DLY(1)' : 13);
-
-  if result.isCrit;
-    ShowMsg('A critical hit!');
-  endif;
-  if result.typeEff > 1;
-    ShowMsg('It''s super effective!');
-  elseif result.typeEff < 1;
-    ShowMsg('It''s not very effective...');
-  endif;
-endsr;
 
 // --- Handle enemy switching after faint ---
 begsr HandleEnemySwitch;
@@ -989,6 +820,78 @@ endsr;
 // =============================================================
 // SUBPROCEDURES
 // =============================================================
+
+// -------------------------------------------------------------
+// DoAttack - Execute one side's attack with damage + display
+// Returns damage result. Modifies attacker PP and defender HP.
+// -------------------------------------------------------------
+dcl-proc DoAttack;
+  dcl-pi *n likeds(dmg_t);
+    attacker  likeds(pkmn_t);
+    defender  likeds(pkmn_t);
+    moveIdx   int(5) const;
+    isPlayer  ind const;
+    accRoll   packed(7:6) const;
+    crtRoll   packed(7:6) const;
+    dmgRoll   packed(7:6) const;
+  end-pi;
+
+  dcl-ds res likeds(dmg_t) inz;
+
+  // Decrement PP
+  attacker.moves(moveIdx).curPP -= 1;
+
+  ShowMsg(%trim(attacker.name) + ' used '
+        + %trim(attacker.moves(moveIdx).name) + '!');
+
+  // Status moves (power = 0) - nothing happens yet
+  if attacker.moves(moveIdx).power = 0;
+    ShowMsg('But nothing happened!');
+    return res;
+  endif;
+
+  res = CalcDamage(attacker : defender : attacker.moves(moveIdx)
+                  : accRoll : crtRoll : dmgRoll);
+
+  if not res.didHit;
+    ShowMsg(%trim(attacker.name) + '''s attack missed!');
+    return res;
+  endif;
+
+  if res.typeEff = 0;
+    ShowMsg('It doesn''t affect ' + %trim(defender.name) + '...');
+    return res;
+  endif;
+
+  // Apply damage
+  defender.hp -= res.damage;
+  if defender.hp < 0;
+    defender.hp = 0;
+  endif;
+
+  // Refresh the correct side's display
+  if isPlayer;
+    OPHPBR = BuildHPBar(defender.hp : defender.maxHp);
+    OPCRHP = defender.hp;
+    write OPPONENT;
+  else;
+    PLHPBR = BuildHPBar(defender.hp : defender.maxHp);
+    PLCRHP = defender.hp;
+    write PLAYER;
+  endif;
+  QCMDEXC('DLYJOB DLY(1)' : 13);
+
+  if res.isCrit;
+    ShowMsg('A critical hit!');
+  endif;
+  if res.typeEff > 1;
+    ShowMsg('It''s super effective!');
+  elseif res.typeEff < 1;
+    ShowMsg('It''s not very effective...');
+  endif;
+
+  return res;
+end-proc;
 
 // -------------------------------------------------------------
 // LoadActivePkmn - Load active Pokemon from battle tables

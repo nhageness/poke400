@@ -4,3 +4,9 @@ PUB400.COM/
 # Claude Code
 CLAUDE.md
 .claude/
+
+# Deploy script (contains credentials)
+pub400_deploy.js
+node_modules/
+package.json
+package-lock.json
