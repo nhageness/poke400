@@ -130,6 +130,10 @@ dcl-pr ApplyStage int(5);
   stage    int(5) const;
 end-pr;
 
+dcl-pr Delay;
+  secs int(5) const;
+end-pr;
+
 dcl-pr LoadActivePkmn ind;
   ds     likeds(pkmn_t);
   room   char(8) const;
@@ -415,15 +419,15 @@ dow battleOn;
 
     if plyrAlive = 0 and enmyAlive = 0;
       ShowMsg('It''s a draw!');
-      QCMDEXC('DLYJOB DLY(2)' : 13);
+      Delay(2);
       battleOn = *off;
     elseif plyrAlive = 0;
       ShowMsg('You lost...');
-      QCMDEXC('DLYJOB DLY(2)' : 13);
+      Delay(2);
       battleOn = *off;
     elseif enmyAlive = 0;
       ShowMsg('You win!');
-      QCMDEXC('DLYJOB DLY(2)' : 13);
+      Delay(2);
       battleOn = *off;
     else;
       // Both need to switch
@@ -449,7 +453,7 @@ dow battleOn;
 
     if enmyAlive = 0;
       ShowMsg('You win!');
-      QCMDEXC('DLYJOB DLY(2)' : 13);
+      Delay(2);
       battleOn = *off;
     else;
       exsr HandleEnemySwitch;
@@ -473,7 +477,7 @@ dow battleOn;
 
     if plyrAlive = 0;
       ShowMsg('You lost...');
-      QCMDEXC('DLYJOB DLY(2)' : 13);
+      Delay(2);
       battleOn = *off;
     else;
       exsr HandlePlayerSwitch;
@@ -528,7 +532,7 @@ begsr EndOfTurnLeechSeed_Plyr;
     PLHPBR = BuildHPBar(plyr.hp : plyr.maxHp);
     PLCRHP = plyr.hp;
     write PLAYER;
-    QCMDEXC('DLYJOB DLY(1)' : 13);
+    Delay(1);
 
     // Heal the other side
     enmy.hp += seedDmg;
@@ -557,7 +561,7 @@ begsr EndOfTurnLeechSeed_Enmy;
     OPHPBR = BuildHPBar(enmy.hp : enmy.maxHp);
     OPCRHP = enmy.hp;
     write OPPONENT;
-    QCMDEXC('DLYJOB DLY(1)' : 13);
+    Delay(1);
 
     // Heal the other side
     plyr.hp += seedDmg;
@@ -612,7 +616,7 @@ begsr MPExchangeMoves;
   if pPlayer = 1;
     wP2Move = 0;
     dow wP2Move = 0;
-      QCMDEXC('DLYJOB DLY(1)' : 13);
+      Delay(1);
       exec sql
         SELECT COALESCE(P2_MOVE, 0) INTO :wP2Move
           FROM NHAGENCO1.BATTLE_SESSION
@@ -621,7 +625,7 @@ begsr MPExchangeMoves;
   else;
     wP1Move = 0;
     dow wP1Move = 0;
-      QCMDEXC('DLYJOB DLY(1)' : 13);
+      Delay(1);
       exec sql
         SELECT COALESCE(P1_MOVE, 0) INTO :wP1Move
           FROM NHAGENCO1.BATTLE_SESSION
@@ -684,7 +688,7 @@ begsr MPExchangeMoves;
     // P2 polls until P1 resolves
     turnState = *blanks;
     dow turnState <> 'RESOLVE';
-      QCMDEXC('DLYJOB DLY(1)' : 13);
+      Delay(1);
       exec sql
         SELECT TURN_STATE INTO :turnState
           FROM NHAGENCO1.BATTLE_SESSION
@@ -797,7 +801,7 @@ begsr HandleEnemySwitch;
     ShowMsg('Waiting for opponent to choose...');
     wOldActive = 'N';
     dow wOldActive <> 'Y';
-      QCMDEXC('DLYJOB DLY(1)' : 13);
+      Delay(1);
       // Check if opponent has set a new active Pokemon
       exec sql
         SELECT IS_ACTIVE INTO :wOldActive
@@ -1121,7 +1125,7 @@ dcl-proc DoAttack;
       PLCRHP = defender.hp;
       write PLAYER;
     endif;
-    QCMDEXC('DLYJOB DLY(1)' : 13);
+    Delay(1);
 
       when mvEffect = 'FIXED 40';
         // Dragon Rage: always 40
@@ -1140,7 +1144,7 @@ dcl-proc DoAttack;
       PLCRHP = defender.hp;
       write PLAYER;
     endif;
-    QCMDEXC('DLYJOB DLY(1)' : 13);
+    Delay(1);
 
       when mvEffect = 'DRAIN';
         // Leech Seed: seed the defender
@@ -1187,7 +1191,7 @@ dcl-proc DoAttack;
     PLCRHP = defender.hp;
     write PLAYER;
   endif;
-  QCMDEXC('DLYJOB DLY(1)' : 13);
+  Delay(1);
 
   if res.isCrit;
     ShowMsg('A critical hit!');
@@ -1220,7 +1224,7 @@ dcl-proc DoAttack;
       OPCRHP = attacker.hp;
       write OPPONENT;
     endif;
-    QCMDEXC('DLYJOB DLY(1)' : 13);
+    Delay(1);
   endif;
 
   // Drain (Dream Eater: heal 1/2 damage dealt)
@@ -1244,7 +1248,7 @@ dcl-proc DoAttack;
       OPCRHP = attacker.hp;
       write OPPONENT;
     endif;
-    QCMDEXC('DLYJOB DLY(1)' : 13);
+    Delay(1);
   endif;
 
   // Stat drops from damaging moves (Psychic = SPDEF DN, Bubble Beam = SPD DOWN)
@@ -1354,7 +1358,7 @@ dcl-proc ApplyEndOfTurn;
     OPCRHP = pkmn.hp;
     write OPPONENT;
   endif;
-  QCMDEXC('DLYJOB DLY(1)' : 13);
+  Delay(1);
 end-proc;
 
 // -------------------------------------------------------------
@@ -1780,6 +1784,20 @@ dcl-proc ApplyStage;
 end-proc;
 
 // -------------------------------------------------------------
+// Delay - Park cursor on MSGLINE then delay
+// -------------------------------------------------------------
+dcl-proc Delay;
+  dcl-pi *n;
+    secs int(5) const;
+  end-pi;
+
+  dcl-s cmd char(30);
+
+  cmd = 'DLYJOB DLY(' + %trim(%char(secs)) + ')';
+  QCMDEXC(cmd : %len(%trim(cmd)));
+end-proc;
+
+// -------------------------------------------------------------
 // BuildHPBar - 20-char visual HP bar
 // -------------------------------------------------------------
 dcl-proc BuildHPBar;
@@ -1836,7 +1854,7 @@ dcl-proc ShowMsg;
   endif;
 
   write MSGLINE;
-  QCMDEXC('DLYJOB DLY(2)' : 13);
+  Delay(2);
 end-proc;
 
 // -------------------------------------------------------------
