@@ -181,6 +181,9 @@ dcl-ds result2 likeds(dmg_t) inz;
 
 dcl-s battleOn ind inz(*on);
 dcl-s moveChoice int(5);
+dcl-s turnAction char(1);
+dcl-s switchSlot int(10);
+dcl-s actionPicked ind;
 dcl-s vswSide char(1);
 dcl-s vswNewSlot int(5);
 dcl-s vswTargetPlayer int(5);
@@ -299,37 +302,35 @@ endif;
 // =============================================================
 dow battleOn;
 
-  // Populate move menu
-  MV1NAM = plyr.moves(1).name;
-  MV1PP = %trim(%char(plyr.moves(1).curPP)) + '/'
-        + %trim(%char(plyr.moves(1).pp));
-  MV2NAM = plyr.moves(2).name;
-  MV2PP = %trim(%char(plyr.moves(2).curPP)) + '/'
-        + %trim(%char(plyr.moves(2).pp));
-  MV3NAM = plyr.moves(3).name;
-  MV3PP = %trim(%char(plyr.moves(3).curPP)) + '/'
-        + %trim(%char(plyr.moves(3).pp));
-  MV4NAM = plyr.moves(4).name;
-  MV4PP = %trim(%char(plyr.moves(4).curPP)) + '/'
-        + %trim(%char(plyr.moves(4).pp));
-  MVSEL = ' ';
+  // Top-level action selection: FIGHT or PKMN switch.
+  // ACTMENU loops until the user picks a valid action or quits
+  // with F3. F12 inside the popups returns here with no pick.
+  actionPicked = *off;
+  turnAction = ' ';
+  switchSlot = 0;
+  dow not actionPicked;
+    exfmt ACTMENU;
+    if *in03;
+      leave;
+    endif;
 
-  exfmt MOVEMENU;
-
+    select;
+      when CursorToAction(ACTROW : ACTCOL) = 'F';
+        moveChoice = PickMove();
+        if moveChoice > 0;
+          turnAction = 'M';
+          actionPicked = *on;
+        endif;
+      when CursorToAction(ACTROW : ACTCOL) = 'P';
+        switchSlot = PickSwitchVoluntary();
+        if switchSlot > 0;
+          turnAction = 'S';
+          actionPicked = *on;
+        endif;
+    endsl;
+  enddo;
   if *in03;
     leave;
-  endif;
-
-  if MVSEL < '1' or MVSEL > '4';
-    iter;
-  endif;
-  moveChoice = %int(MVSEL);
-
-  if plyr.moves(moveChoice).curPP <= 0;
-    iter;
-  endif;
-  if plyr.moves(moveChoice).id = 0;
-    iter;
   endif;
 
   // -------------------------------------------------------
