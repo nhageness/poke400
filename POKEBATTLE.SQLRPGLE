@@ -1880,11 +1880,17 @@ dcl-proc ParseArt;
   dcl-s startPos int(5);
   dcl-s pos int(5);
   dcl-s artLen int(5);
+  dcl-s cleanArt varchar(500);
+
+  // Strip embedded control chars (CR/LF/NL) so they can't be
+  // interpreted as 5250 field attribute bytes. These sneak in
+  // when art is pasted into the DB across multiple lines.
+  cleanArt = %xlate(x'0D25150A' : '    ' : artStr);
 
   clear lines;
   lineNum = 1;
   startPos = 1;
-  artLen = %len(artStr);
+  artLen = %len(cleanArt);
 
   if artLen = 0;
     l1 = *blanks;
@@ -1901,10 +1907,10 @@ dcl-proc ParseArt;
   endif;
 
   for pos = 1 to artLen;
-    if %subst(artStr : pos : 1) = '#';
+    if %subst(cleanArt : pos : 1) = '#';
       if lineNum <= 10;
         if pos > startPos;
-          lines(lineNum) = %subst(artStr : startPos : pos - startPos);
+          lines(lineNum) = %subst(cleanArt : startPos : pos - startPos);
         endif;
         lineNum += 1;
       endif;
@@ -1913,7 +1919,7 @@ dcl-proc ParseArt;
   endfor;
 
   if startPos <= artLen and lineNum <= 10;
-    lines(lineNum) = %subst(artStr : startPos : artLen - startPos + 1);
+    lines(lineNum) = %subst(cleanArt : startPos : artLen - startPos + 1);
   endif;
 
   l1  = lines(1);

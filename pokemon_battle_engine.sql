@@ -283,11 +283,25 @@ CREATE OR REPLACE TABLE NHAGENCO1.POKEDEX (
     SP_ATK      SMALLINT       NOT NULL,      -- Gen 1: "Special" for both
     SP_DEF      SMALLINT       NOT NULL,      -- Gen 1: same as SP_ATK
     SPEED       SMALLINT       NOT NULL,
-    ASCII_ART   VARCHAR(500),                 -- pipe-delimited lines
+    ASCII_ART   VARCHAR(500),                 -- '#'-delimited, single-line (see note by inserts)
     BATTLE_CRY  VARCHAR(30),                  -- text displayed on entry
     PRIMARY KEY (PKMN_ID),
     FOREIGN KEY (TYPE1) REFERENCES NHAGENCO1.TYPES(TYPE_ID)
 );
+
+-- ============================================================
+-- IMPORTANT: ASCII_ART must be a SINGLE-LINE string literal.
+-- Do NOT paste multi-line art or let your editor wrap the string
+-- across multiple lines. Embedded CR/LF characters survive into
+-- the column and, when written to a 5250 output field, get
+-- interpreted by the terminal as display attribute bytes --
+-- causing reverse image or other weird rendering.
+--
+-- Format: lines separated by '#' (not '|' -- CCSID 273 safe).
+-- Max 10 lines, each up to 25 characters wide.
+-- POKEBATTLE's ParseArt defensively strips CR/LF at runtime,
+-- but keep the source clean so the column data stays clean too.
+-- ============================================================
 
 -- Starters & evolutions
 INSERT INTO NHAGENCO1.POKEDEX VALUES (1, 'BULBASAUR', 5, 8, 45, 49, 49, 65, 65, 45,
