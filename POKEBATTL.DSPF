@@ -297,6 +297,7 @@
      A                                      ERASE(MOVEMENU)
      A                                      ERASE(SWITCHMN)
      A                                      ERASE(ACTMENU)
+     A                                      ERASE(PKMNWIN)
      A            MSG1          70A  O 25  5
      A                                      OVRDTA
      A            MSG2          70A  O 26  5
@@ -372,3 +373,48 @@
      A                                      DSPATR(HI)
      A                                 25 50'Move cursor, Enter=Pick'
      A                                      DSPATR(HI)
+     A*
+     A*== PKMNWIN - Voluntary switch popup (EXFMT) ================
+     A*  3x2 grid of party slots. Cursor-based selection.
+     A*  PWxFNT = '1' for fainted (drives indicators 90-95).
+     A          R PKMNWIN
+     A                                      OVERLAY
+     A                                      WINDOW(*POPUP 15 40 10 50)
+     A                                      WDWBORDER
+     A                                      CSRLOC(SWROW SWCOL)
+     A                                      CA12(12 'F12=Back')
+     A            SWROW          3S 0H
+     A            SWCOL          3S 0H
+     A                                  1  2'Choose a Pokemon:'
+     A                                      DSPATR(HI)
+     A            PW1TGT         1A  I  3  2DSPATR(ND)
+     A                                      DSPATR(PC)
+     A            PW1NAM        12A  O  3  3
+     A            PW1HP          7A  O  3 16
+     A            PW1FNT         1A  O  3 24DSPATR(ND)
+     A  90                                  DSPATR(HI RI)
+     A            PW2TGT         1A  I  3 25DSPATR(ND)
+     A            PW2NAM        12A  O  3 26
+     A            PW2HP          7A  O  3 39
+     A            PW2FNT         1A  O  3 47DSPATR(ND)
+     A  91                                  DSPATR(HI RI)
+     A            PW3TGT         1A  I  5  2DSPATR(ND)
+     A            PW3NAM        12A  O  5  3
+     A            PW3HP          7A  O  5 16
+     A            PW3FNT         1A  O  5 24DSPATR(ND)
+     A  92                                  DSPATR(HI RI)
+     A            PW4TGT         1A  I  5 25DSPATR(ND)
+     A            PW4NAM        12A  O  5 26
+     A            PW4HP          7A  O  5 39
+     A            PW4FNT         1A  O  5 47DSPATR(ND)
+     A  93                                  DSPATR(HI RI)
+     A            PW5TGT         1A  I  7  2DSPATR(ND)
+     A            PW5NAM        12A  O  7  3
+     A            PW5HP          7A  O  7 16
+     A            PW5FNT         1A  O  7 24DSPATR(ND)
+     A  94                                  DSPATR(HI RI)
+     A            PW6TGT         1A  I  7 25DSPATR(ND)
+     A            PW6NAM        12A  O  7 26
+     A            PW6HP          7A  O  7 39
+     A            PW6FNT         1A  O  7 47DSPATR(ND)
+     A  95                                  DSPATR(HI RI)
