@@ -5,7 +5,7 @@
      A* Layout:
      A*   Rows  1-12  OPPONENT  info cols 5-40   art cols 91-130 (40w x 12h)
      A*   Rows 13-24  PLAYER    art cols 5-44    info cols 91-123 (40w x 12h)
-     A*   Rows 25-27  MSG / MOVEMENU / SWITCHMN
+     A*   Rows 25-27  MSG / MOVEMENU / PKMNWIN
      A*
      A* Color indicators (set by POKEBATTLE before WRITE):
      A*   Player side (PLART*):  30=GRN 31=WHT 32=RED 33=TRQ 34=YLW 35=PNK 36=BLU
@@ -295,7 +295,6 @@
      A                                      CLRL(*NO)
      A                                      FRCDTA
      A                                      ERASE(MOVEMENU)
-     A                                      ERASE(SWITCHMN)
      A                                      ERASE(ACTMENU)
      A                                      ERASE(PKMNWIN)
      A            MSG1          70A  O 25  5
@@ -333,27 +332,6 @@
      A                                  5  2'Move cursor, Enter=Pick -
      A                                      F12=Back'
      A                                      DSPATR(HI)
-     A*
-     A*== SWITCHMN - Switch Pokemon (EXFMT) =======================
-     A          R SWITCHMN
-     A                                      OVERLAY
-     A                                      ERASE(MSGLINE)
-     A                                 25  5'Choose a Pokemon:'
-     A                                      DSPATR(HI)
-     A            SW1NAM        12A  O 26  5
-     A            SW1HP          7A  O 26 19
-     A            SW2NAM        12A  O 26 30
-     A            SW2HP          7A  O 26 44
-     A            SW3NAM        12A  O 26 55
-     A            SW3HP          7A  O 26 69
-     A            SW4NAM        12A  O 27  5
-     A            SW4HP          7A  O 27 19
-     A            SW5NAM        12A  O 27 30
-     A            SW5HP          7A  O 27 44
-     A            SW6NAM        12A  O 27 55
-     A            SW6HP          7A  O 27 69
-     A            SWSEL          1A  B 26 80
-     A                                 26 83'(1-6)'
      A*
      A*== ACTMENU - Top-level action picker (EXFMT) ===============
      A*  FIGHT / PKMN cursor-based menu on rows 25-26.
