@@ -309,8 +309,10 @@
      A*  Cursor-based: arrow keys to target field, Enter to pick.
      A          R MOVEMENU
      A                                      OVERLAY
-     A                                      WINDOW(*POPUP 20 35 7 60)
-     A                                      WDWBORDER
+     A                                      WINDOW(10 30 7 60)
+     A                                      WDWBORDER((*COLOR BLU) -
+     A                                      (*DSPATR RI) -
+     A                                      (*CHAR '        '))
      A                                      CSRLOC(MVROW MVCOL)
      A                                      CA12(12 'F12=Back')
      A            MVROW          3S 0H
@@ -379,8 +381,10 @@
      A*  PWxFNT = '1' for fainted (drives indicators 90-95).
      A          R PKMNWIN
      A                                      OVERLAY
-     A                                      WINDOW(*POPUP 15 40 10 50)
-     A                                      WDWBORDER
+     A                                      WINDOW(8 40 10 50)
+     A                                      WDWBORDER((*COLOR BLU) -
+     A                                      (*DSPATR RI) -
+     A                                      (*CHAR '        '))
      A                                      CSRLOC(SWROW SWCOL)
      A                                      CA12(12 'F12=Back')
      A            SWROW          3S 0H
