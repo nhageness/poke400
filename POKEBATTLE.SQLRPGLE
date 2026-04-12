@@ -1041,7 +1041,7 @@ begsr HandlePlayerSwitch;
 endsr;
 
 // --- Pick switch Pokemon after faint (forced) ---
-//     Routes through PKMNWIN with FORCED='1'; F12 is ignored by
+//     Routes through PKMNWIN with forced=*on; F12 is ignored by
 //     PickSwitchVoluntary when forced. F3 still abandons battle.
 begsr PickSwitch;
   swChoice = PickSwitchVoluntary(*on);
@@ -2282,12 +2282,6 @@ dcl-proc PickSwitchVoluntary;
       slots(i).present = *on;
     endif;
   endfor;
-
-  if forced;
-    FORCED = '1';
-  else;
-    FORCED = '0';
-  endif;
 
   dow *on;
     // Slot 1

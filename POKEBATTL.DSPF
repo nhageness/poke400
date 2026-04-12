@@ -389,7 +389,6 @@
      A                                      CA12(12 'F12=Back')
      A            CSRRCD        10A  H
      A            CSRFLD        10A  H
-     A            FORCED         1A  H
      A                                  1  2'Choose a Pokemon:'
      A                                      DSPATR(HI)
      A            CURPW1         1A  B  3  3DSPATR(HI)
