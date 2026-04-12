@@ -313,10 +313,10 @@
      A                                      WDWBORDER((*COLOR BLU) -
      A                                      (*DSPATR RI) -
      A                                      (*CHAR '        '))
-     A                                      CSRLOC(MVROW MVCOL)
+     A                                      RTNCSRLOC(&CSRRCD &CSRFLD)
      A                                      CA12(12 'F12=Back')
-     A            MVROW          3S 0H
-     A            MVCOL          3S 0H
+     A            CSRRCD        10A  H
+     A            CSRFLD        10A  H
      A            MV1NAM        16A  B  2  3DSPATR(PR)
      A                                      DSPATR(PC)
      A            MV1PP          7A  O  2 22
@@ -356,10 +356,10 @@
      A          R ACTMENU
      A                                      OVERLAY
      A                                      ERASE(MSGLINE)
-     A                                      CSRLOC(ACTROW ACTCOL)
+     A                                      RTNCSRLOC(&CSRRCD &CSRFLD)
      A                                      CA12(12 'F12=Back')
-     A            ACTROW         3S 0H
-     A            ACTCOL         3S 0H
+     A            CSRRCD        10A  H
+     A            CSRFLD        10A  H
      A                                 25  5'What will you do?'
      A                                      DSPATR(HI)
      A            ACTFGT         5A  B 26 10DSPATR(HI)
@@ -379,10 +379,10 @@
      A                                      WDWBORDER((*COLOR BLU) -
      A                                      (*DSPATR RI) -
      A                                      (*CHAR '        '))
-     A                                      CSRLOC(SWROW SWCOL)
+     A                                      RTNCSRLOC(&CSRRCD &CSRFLD)
      A                                      CA12(12 'F12=Back')
-     A            SWROW          3S 0H
-     A            SWCOL          3S 0H
+     A            CSRRCD        10A  H
+     A            CSRFLD        10A  H
      A                                  1  2'Choose a Pokemon:'
      A                                      DSPATR(HI)
      A            PW1NAM        12A  B  3  3DSPATR(PR)

@@ -150,20 +150,17 @@ dcl-pr SavePkmnState;
   player int(5) const;
 end-pr;
 
-// Cursor-to-selection helpers
-dcl-pr CursorToAction char(1);
-  row int(10) const;
-  col int(10) const;
+// Cursor-to-selection helpers (field-name based via RTNCSRLOC)
+dcl-pr FieldToAction char(1);
+  fld char(10) const;
 end-pr;
 
-dcl-pr CursorToMoveIdx int(10);
-  row int(10) const;
-  col int(10) const;
+dcl-pr FieldToMoveIdx int(10);
+  fld char(10) const;
 end-pr;
 
-dcl-pr CursorToSlotIdx int(10);
-  row int(10) const;
-  col int(10) const;
+dcl-pr FieldToSlotIdx int(10);
+  fld char(10) const;
 end-pr;
 
 // Voluntary action picker procedures
@@ -333,13 +330,13 @@ dow battleOn;
     endif;
 
     select;
-      when CursorToAction(ACTROW : ACTCOL) = 'F';
+      when FieldToAction(CSRFLD) = 'F';
         moveChoice = PickMove();
         if moveChoice > 0;
           turnAction = 'M';
           actionPicked = *on;
         endif;
-      when CursorToAction(ACTROW : ACTCOL) = 'P';
+      when FieldToAction(CSRFLD) = 'P';
         switchSlot = PickSwitchVoluntary();
         if switchSlot > 0;
           turnAction = 'S';
@@ -2216,85 +2213,63 @@ dcl-proc ParseArt;
 end-proc;
 
 // -------------------------------------------------------------
-// CursorToAction - Map ACTMENU cursor coords to action letter
+// FieldToAction - Map CSRFLD field name to action letter
 // 'F' = fight, 'P' = pkmn, ' ' = invalid
 // -------------------------------------------------------------
-dcl-proc CursorToAction;
+dcl-proc FieldToAction;
   dcl-pi *n char(1);
-    row int(10) const;
-    col int(10) const;
+    fld char(10) const;
   end-pi;
-  // ACTMENU labels on row 26: FIGHT at col 10, PKMN at col 30.
-  if row = 26;
-    if col >= 5 and col <= 20;
+  select;
+    when %trim(fld) = 'ACTFGT';
       return 'F';
-    endif;
-    if col >= 25 and col <= 40;
+    when %trim(fld) = 'ACTPKM';
       return 'P';
-    endif;
-  endif;
+  endsl;
   return ' ';
 end-proc;
 
 // -------------------------------------------------------------
-// CursorToMoveIdx - Map MOVEMENU cursor coords to move 1-4, 0 if invalid
+// FieldToMoveIdx - Map CSRFLD name to move 1-4, 0 if invalid
 // -------------------------------------------------------------
-dcl-proc CursorToMoveIdx;
+dcl-proc FieldToMoveIdx;
   dcl-pi *n int(10);
-    row int(10) const;
-    col int(10) const;
+    fld char(10) const;
   end-pi;
-  // MOVEMENU window at screen (10,30), 7 rows x 60 cols.
-  // Window row 2 = screen row 11, window row 3 = screen row 12.
-  // Move 1 target screen col 31, move 2 col 59,
-  // move 3 col 31, move 4 col 59.
-  if row = 11;
-    if col >= 30 and col <= 55;
+  select;
+    when %trim(fld) = 'MV1NAM';
       return 1;
-    endif;
-    if col >= 58 and col <= 90;
+    when %trim(fld) = 'MV2NAM';
       return 2;
-    endif;
-  endif;
-  if row = 12;
-    if col >= 30 and col <= 55;
+    when %trim(fld) = 'MV3NAM';
       return 3;
-    endif;
-    if col >= 58 and col <= 90;
+    when %trim(fld) = 'MV4NAM';
       return 4;
-    endif;
-  endif;
+  endsl;
   return 0;
 end-proc;
 
 // -------------------------------------------------------------
-// CursorToSlotIdx - Map PKMNWIN cursor coords to slot 1-6, 0 if invalid
+// FieldToSlotIdx - Map CSRFLD name to slot 1-6, 0 if invalid
 // -------------------------------------------------------------
-dcl-proc CursorToSlotIdx;
+dcl-proc FieldToSlotIdx;
   dcl-pi *n int(10);
-    row int(10) const;
-    col int(10) const;
+    fld char(10) const;
   end-pi;
-  dcl-s rowIdx int(10) inz(0);
-  // PKMNWIN window at screen (8,40), 10 rows x 50 cols.
-  // Content window rows 3/5/7 -> screen rows 10/12/14.
-  // Left target screen col 41, right target screen col 64.
   select;
-    when row = 10;
-      rowIdx = 0;
-    when row = 12;
-      rowIdx = 2;
-    when row = 14;
-      rowIdx = 4;
-    other;
-      return 0;
+    when %trim(fld) = 'PW1NAM';
+      return 1;
+    when %trim(fld) = 'PW2NAM';
+      return 2;
+    when %trim(fld) = 'PW3NAM';
+      return 3;
+    when %trim(fld) = 'PW4NAM';
+      return 4;
+    when %trim(fld) = 'PW5NAM';
+      return 5;
+    when %trim(fld) = 'PW6NAM';
+      return 6;
   endsl;
-  if col >= 40 and col <= 60;
-    return rowIdx + 1;
-  endif;
-  if col >= 63 and col <= 88;
-    return rowIdx + 2;
-  endif;
   return 0;
 end-proc;
 
@@ -2325,7 +2300,7 @@ dcl-proc PickMove;
       return 0;
     endif;
 
-    choice = CursorToMoveIdx(MVROW : MVCOL);
+    choice = FieldToMoveIdx(CSRFLD);
     if choice < 1 or choice > 4;
       iter;
     endif;
@@ -2484,7 +2459,7 @@ dcl-proc PickSwitchVoluntary;
       return 0;
     endif;
 
-    choice = CursorToSlotIdx(SWROW : SWCOL);
+    choice = FieldToSlotIdx(CSRFLD);
     if choice < 1 or choice > 6;
       iter;
     endif;
