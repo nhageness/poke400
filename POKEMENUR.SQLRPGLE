@@ -25,7 +25,8 @@ end-pr;
 
 // ----- Constants -----
 dcl-c MAX_TEAM 6;
-dcl-c MAX_ROSTER 18;
+dcl-c MAX_ROSTER 500;
+dcl-c PAGE_SIZE 18;
 
 // ----- Global Variables -----
 dcl-s running ind inz(*on);
@@ -34,16 +35,19 @@ dcl-s j int(5);
 
 // Roster data (loaded from POKEDEX)
 dcl-s rCount int(5);
-dcl-s rId    int(5) dim(18);
-dcl-s rName  char(12) dim(18);
-dcl-s rT1nm  char(10) dim(18);
-dcl-s rT2nm  char(10) dim(18);
-dcl-s rHP    int(5) dim(18);
-dcl-s rAtk   int(5) dim(18);
-dcl-s rDef   int(5) dim(18);
-dcl-s rSpA   int(5) dim(18);
-dcl-s rSpD   int(5) dim(18);
-dcl-s rSpeed int(5) dim(18);
+dcl-s rId    int(5)   dim(MAX_ROSTER);
+dcl-s rName  char(12) dim(MAX_ROSTER);
+dcl-s rT1nm  char(10) dim(MAX_ROSTER);
+dcl-s rT2nm  char(10) dim(MAX_ROSTER);
+dcl-s rHP    int(5)   dim(MAX_ROSTER);
+dcl-s rAtk   int(5)   dim(MAX_ROSTER);
+dcl-s rDef   int(5)   dim(MAX_ROSTER);
+dcl-s rSpA   int(5)   dim(MAX_ROSTER);
+dcl-s rSpD   int(5)   dim(MAX_ROSTER);
+dcl-s rSpeed int(5)   dim(MAX_ROSTER);
+dcl-s pageOffset int(5);
+dcl-s totPages int(5);
+dcl-s curPage int(5);
 
 // SQL work variables
 dcl-s wId    int(5);
@@ -64,7 +68,7 @@ dcl-s plyrCnt  int(5);
 dcl-s enmyTeam int(5) dim(6);
 dcl-s enmyCnt  int(5);
 
-dcl-s selVal char(2);
+dcl-s selVal char(3);
 dcl-s selNum int(5);
 dcl-s randVal packed(7:6);
 dcl-s teamStr char(60);
@@ -155,8 +159,7 @@ begsr LoadRoster;
       FROM NHAGENCO1.POKEDEX p
       JOIN NHAGENCO1.TYPES t1 ON t1.TYPE_ID = p.TYPE1
       LEFT JOIN NHAGENCO1.TYPES t2 ON t2.TYPE_ID = p.TYPE2
-     ORDER BY p.PKMN_ID
-     FETCH FIRST 18 ROWS ONLY;
+     ORDER BY p.PKMN_ID;
 
   exec sql OPEN c_roster;
 
@@ -483,6 +486,7 @@ endsr;
 
 // --- Pick player team ---
 begsr PickTeam;
+  pageOffset = 0;
   exsr ShowRoster;
   PKTITLE = 'Choose YOUR team (up to 6)';
 
@@ -507,10 +511,28 @@ begsr PickTeam;
       leavesr;
     endif;
 
+    // Paging (Page Down / Page Up = Roll keys)
+    if *in25;
+      if pageOffset + PAGE_SIZE < rCount;
+        pageOffset += PAGE_SIZE;
+      endif;
+      exsr ShowRoster;
+      iter;
+    endif;
+    if *in26;
+      if pageOffset - PAGE_SIZE >= 0;
+        pageOffset -= PAGE_SIZE;
+      else;
+        pageOffset = 0;
+      endif;
+      exsr ShowRoster;
+      iter;
+    endif;
+
     selVal = PKSEL;
 
     // Done selecting
-    if selVal = '0' or selVal = '0 ';
+    if %trim(selVal) = '0';
       if plyrCnt > 0;
         leave;
       endif;
@@ -519,8 +541,7 @@ begsr PickTeam;
     endif;
 
     // Random fill
-    if selVal = 'R' or selVal = 'r'
-       or selVal = 'R ' or selVal = 'r ';
+    if %trim(selVal) = 'R' or %trim(selVal) = 'r';
       dow plyrCnt < MAX_TEAM;
         exec sql SET :randVal = RAND();
         selNum = %int(randVal * rCount) + 1;
@@ -575,6 +596,7 @@ endsr;
 
 // --- Pick enemy team ---
 begsr PickEnemyTeam;
+  pageOffset = 0;
   exsr ShowRoster;
   PKTITLE = 'Choose OPPONENT team (up to 6, R=random)';
 
@@ -598,10 +620,28 @@ begsr PickEnemyTeam;
       leavesr;
     endif;
 
+    // Paging
+    if *in25;
+      if pageOffset + PAGE_SIZE < rCount;
+        pageOffset += PAGE_SIZE;
+      endif;
+      exsr ShowRoster;
+      iter;
+    endif;
+    if *in26;
+      if pageOffset - PAGE_SIZE >= 0;
+        pageOffset -= PAGE_SIZE;
+      else;
+        pageOffset = 0;
+      endif;
+      exsr ShowRoster;
+      iter;
+    endif;
+
     selVal = PKSEL;
 
     // Done selecting
-    if selVal = '0' or selVal = '0 ';
+    if %trim(selVal) = '0';
       if enmyCnt > 0;
         leave;
       endif;
@@ -610,8 +650,7 @@ begsr PickEnemyTeam;
     endif;
 
     // Random fill
-    if selVal = 'R' or selVal = 'r'
-       or selVal = 'R ' or selVal = 'r ';
+    if %trim(selVal) = 'R' or %trim(selVal) = 'r';
       dow enmyCnt < MAX_TEAM;
         exec sql SET :randVal = RAND();
         selNum = %int(randVal * rCount) + 1;
@@ -661,35 +700,54 @@ begsr PickEnemyTeam;
   enddo;
 endsr;
 
-// --- Populate roster display fields ---
+// --- Populate roster display fields (windowed view) ---
 begsr ShowRoster;
-  for i = 1 to rCount;
+  // Clamp pageOffset
+  if rCount <= 0;
+    totPages = 1;
+  else;
+    totPages = (rCount + PAGE_SIZE - 1) / PAGE_SIZE;
+  endif;
+  if pageOffset < 0;
+    pageOffset = 0;
+  endif;
+  if pageOffset >= rCount;
+    pageOffset = (totPages - 1) * PAGE_SIZE;
+    if pageOffset < 0;
+      pageOffset = 0;
+    endif;
+  endif;
+  curPage = (pageOffset / PAGE_SIZE) + 1;
+
+  PKPAGE = 'Page ' + %trim(%char(curPage)) + '/'
+           + %trim(%char(totPages));
+
+  for i = 1 to PAGE_SIZE;
     lineStr = *blanks;
+    k = pageOffset + i;
 
-    // Row number (right-justified in 2 chars)
-    if i < 10;
-      %subst(lineStr:1:2) = ' ' + %char(i);
-    else;
-      %subst(lineStr:1:2) = %char(i);
+    if k <= rCount;
+      // Row number (real roster index, right-justified in 3 chars)
+      %subst(lineStr:1:3) = %subst(%editc(k : 'Z') : 3 : 3);
+
+      // Name
+      %subst(lineStr:5:12) = rName(k);
+
+      // Type
+      if rT2nm(k) <> *blanks;
+        %subst(lineStr:18:15) = %trim(rT1nm(k)) + '/' + %trim(rT2nm(k));
+      else;
+        %subst(lineStr:18:10) = rT1nm(k);
+      endif;
+
+      // Stats (editc Z returns 5 chars for int5, right-justified)
+      %subst(lineStr:34:5) = %editc(rHP(k) : 'Z');
+      %subst(lineStr:39:5) = %editc(rAtk(k) : 'Z');
+      %subst(lineStr:44:5) = %editc(rDef(k) : 'Z');
+      %subst(lineStr:49:5) = %editc(rSpA(k) : 'Z');
+      %subst(lineStr:54:5) = %editc(rSpD(k) : 'Z');
+      %subst(lineStr:59:5) = %editc(rSpeed(k) : 'Z');
     endif;
-
-    // Name
-    %subst(lineStr:5:12) = rName(i);
-
-    // Type
-    if rT2nm(i) <> *blanks;
-      %subst(lineStr:18:15) = %trim(rT1nm(i)) + '/' + %trim(rT2nm(i));
-    else;
-      %subst(lineStr:18:10) = rT1nm(i);
-    endif;
-
-    // Stats (editc Z returns 5 chars for int5, right-justified)
-    %subst(lineStr:34:5) = %editc(rHP(i) : 'Z');
-    %subst(lineStr:39:5) = %editc(rAtk(i) : 'Z');
-    %subst(lineStr:44:5) = %editc(rDef(i) : 'Z');
-    %subst(lineStr:49:5) = %editc(rSpA(i) : 'Z');
-    %subst(lineStr:54:5) = %editc(rSpD(i) : 'Z');
-    %subst(lineStr:59:5) = %editc(rSpeed(i) : 'Z');
 
     select;
       when i = 1;
@@ -728,48 +786,6 @@ begsr ShowRoster;
         PK17 = lineStr;
       when i = 18;
         PK18 = lineStr;
-    endsl;
-  endfor;
-
-  // Clear unused rows
-  for i = (rCount + 1) to MAX_ROSTER;
-    select;
-      when i = 1;
-        PK01 = *blanks;
-      when i = 2;
-        PK02 = *blanks;
-      when i = 3;
-        PK03 = *blanks;
-      when i = 4;
-        PK04 = *blanks;
-      when i = 5;
-        PK05 = *blanks;
-      when i = 6;
-        PK06 = *blanks;
-      when i = 7;
-        PK07 = *blanks;
-      when i = 8;
-        PK08 = *blanks;
-      when i = 9;
-        PK09 = *blanks;
-      when i = 10;
-        PK10 = *blanks;
-      when i = 11;
-        PK11 = *blanks;
-      when i = 12;
-        PK12 = *blanks;
-      when i = 13;
-        PK13 = *blanks;
-      when i = 14;
-        PK14 = *blanks;
-      when i = 15;
-        PK15 = *blanks;
-      when i = 16;
-        PK16 = *blanks;
-      when i = 17;
-        PK17 = *blanks;
-      when i = 18;
-        PK18 = *blanks;
     endsl;
   endfor;
 
