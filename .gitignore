@@ -5,8 +5,9 @@ PUB400.COM/
 CLAUDE.md
 .claude/
 
-# Deploy script (contains credentials)
+# Deploy scripts (contain credentials)
 pub400_deploy.js
+pub400_dspf.js
 node_modules/
 package.json
 package-lock.json
