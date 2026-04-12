@@ -192,6 +192,15 @@ dcl-s aiMoveIdx int(5);
 dcl-s enmyMoveIdx int(5);
 dcl-s i int(5);
 dcl-s enmyPlayer int(5);
+dcl-s plyrSkipAttack ind;
+dcl-s enmySkipAttack ind;
+dcl-s enmyAction char(1);
+dcl-s enmySwitchSlot int(10);
+dcl-s firstSwitcher int(10);
+dcl-s wP1Action char(1);
+dcl-s wP2Action char(1);
+dcl-s wP1Switch int(10);
+dcl-s wP2Switch int(10);
 
 dcl-s randVal packed(7:6);
 dcl-s battleMode char(2);
@@ -302,6 +311,13 @@ endif;
 // =============================================================
 dow battleOn;
 
+  // Reset per-turn flags
+  plyrSkipAttack = *off;
+  enmySkipAttack = *off;
+  turnAction = ' ';
+  enmyAction = ' ';
+  enmySwitchSlot = 0;
+
   // Top-level action selection: FIGHT or PKMN switch.
   // ACTMENU loops until the user picks a valid action or quits
   // with F3. F12 inside the popups returns here with no pick.
@@ -337,6 +353,15 @@ dow battleOn;
   // GET OPPONENT MOVE + RESOLVE
   // -------------------------------------------------------
   if battleMode = 'SP';
+    // Player voluntary switch: apply before AI attacks.
+    // AI still attacks normally against the new active mon.
+    if turnAction = 'S';
+      vswSide = 'P';
+      vswNewSlot = switchSlot;
+      exsr ApplyVoluntarySwitch;
+      plyrSkipAttack = *on;
+    endif;
+
     // AI picks random damaging move
     exec sql SET :randVal = RAND();
     aiMoveIdx = %int(randVal * 4) + 1;
@@ -606,16 +631,20 @@ endsr;
 // --- Resolve a turn: both attacks in speed order ---
 begsr ResolveTurn;
   if firstAtk = pPlayer;
-    result = DoAttack(plyr : enmy : moveChoice : *on
-                     : myAcc : myCrt : myDmg);
-    if enmy.hp > 0;
+    if not plyrSkipAttack;
+      result = DoAttack(plyr : enmy : moveChoice : *on
+                       : myAcc : myCrt : myDmg);
+    endif;
+    if enmy.hp > 0 and not enmySkipAttack;
       result2 = DoAttack(enmy : plyr : enmyMoveIdx : *off
                         : opAcc : opCrt : opDmg);
     endif;
   else;
-    result2 = DoAttack(enmy : plyr : enmyMoveIdx : *off
-                      : opAcc : opCrt : opDmg);
-    if plyr.hp > 0;
+    if not enmySkipAttack;
+      result2 = DoAttack(enmy : plyr : enmyMoveIdx : *off
+                        : opAcc : opCrt : opDmg);
+    endif;
+    if plyr.hp > 0 and not plyrSkipAttack;
       result = DoAttack(plyr : enmy : moveChoice : *on
                        : myAcc : myCrt : myDmg);
     endif;
