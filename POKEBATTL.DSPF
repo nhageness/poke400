@@ -296,6 +296,7 @@
      A                                      FRCDTA
      A                                      ERASE(MOVEMENU)
      A                                      ERASE(SWITCHMN)
+     A                                      ERASE(ACTMENU)
      A            MSG1          70A  O 25  5
      A                                      OVRDTA
      A            MSG2          70A  O 26  5
@@ -350,3 +351,24 @@
      A            SW6HP          7A  O 27 69
      A            SWSEL          1A  B 26 80
      A                                 26 83'(1-6)'
+     A*
+     A*== ACTMENU - Top-level action picker (EXFMT) ===============
+     A*  FIGHT / PKMN cursor-based menu on rows 25-26.
+     A          R ACTMENU
+     A                                      OVERLAY
+     A                                      ERASE(MSGLINE)
+     A                                      CSRLOC(ACTROW ACTCOL)
+     A                                      CA12(12 'F12=Back')
+     A            ACTROW         3S 0H
+     A            ACTCOL         3S 0H
+     A                                 25  5'What will you do?'
+     A                                      DSPATR(HI)
+     A            ACTFGT         1A  I 26  9DSPATR(ND)
+     A                                      DSPATR(PC)
+     A                                 26 10'FIGHT'
+     A                                      DSPATR(HI)
+     A            ACTPKM         1A  I 26 29DSPATR(ND)
+     A                                 26 30'PKMN'
+     A                                      DSPATR(HI)
+     A                                 25 50'Move cursor, Enter=Pick'
+     A                                      DSPATR(HI)
