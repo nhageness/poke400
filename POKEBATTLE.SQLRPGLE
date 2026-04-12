@@ -170,6 +170,9 @@ end-pr;
 dcl-pr PickMove int(10);
 end-pr;
 
+dcl-pr PickSwitchVoluntary int(10);
+end-pr;
+
 // ----- Global Variables -----
 dcl-ds plyr likeds(pkmn_t) inz;
 dcl-ds enmy likeds(pkmn_t) inz;
@@ -2142,6 +2145,186 @@ dcl-proc PickMove;
     endif;
     if plyr.moves(choice).curPP <= 0;
       ShowMsg('No PP left!');
+      iter;
+    endif;
+
+    return choice;
+  enddo;
+end-proc;
+
+// -------------------------------------------------------------
+// PickSwitchVoluntary - Display PKMNWIN popup, return team slot or 0
+// -------------------------------------------------------------
+dcl-proc PickSwitchVoluntary;
+  dcl-pi *n int(10);
+  end-pi;
+  dcl-s choice int(10);
+  dcl-s i int(10);
+  dcl-s slotName char(12);
+  dcl-s slotHp  int(10);
+  dcl-s slotMax int(10);
+  dcl-s slotActive char(1);
+  dcl-ds slots qualified dim(6);
+    name char(12);
+    hp int(10);
+    mx int(10);
+    active char(1);
+    present ind;
+  end-ds;
+
+  for i = 1 to 6;
+    clear slots(i);
+    exec sql
+      SELECT p.PKMN_NAME, bp.CURRENT_HP, bp.MAX_HP, bp.IS_ACTIVE
+        INTO :slotName, :slotHp, :slotMax, :slotActive
+        FROM NHAGENCO1.BATTLE_POKEMON bp
+        JOIN NHAGENCO1.POKEDEX p ON bp.PKMN_ID = p.PKMN_ID
+       WHERE bp.ROOM_CODE = :pRoomCode
+         AND bp.PLAYER = :pPlayer
+         AND bp.TEAM_SLOT = :i;
+    if sqlcode = 0;
+      slots(i).name = slotName;
+      slots(i).hp = slotHp;
+      slots(i).mx = slotMax;
+      slots(i).active = slotActive;
+      slots(i).present = *on;
+    endif;
+  endfor;
+
+  dow *on;
+    // Slot 1
+    if slots(1).present;
+      PW1NAM = slots(1).name;
+      PW1HP = %trim(%char(slots(1).hp)) + '/'
+            + %trim(%char(slots(1).mx));
+      if slots(1).hp <= 0;
+        PW1FNT = '1';
+        *in90 = *on;
+      else;
+        PW1FNT = ' ';
+        *in90 = *off;
+      endif;
+    else;
+      PW1NAM = *blanks;
+      PW1HP = *blanks;
+      PW1FNT = ' ';
+      *in90 = *off;
+    endif;
+
+    // Slot 2
+    if slots(2).present;
+      PW2NAM = slots(2).name;
+      PW2HP = %trim(%char(slots(2).hp)) + '/'
+            + %trim(%char(slots(2).mx));
+      if slots(2).hp <= 0;
+        PW2FNT = '1';
+        *in91 = *on;
+      else;
+        PW2FNT = ' ';
+        *in91 = *off;
+      endif;
+    else;
+      PW2NAM = *blanks;
+      PW2HP = *blanks;
+      PW2FNT = ' ';
+      *in91 = *off;
+    endif;
+
+    // Slot 3
+    if slots(3).present;
+      PW3NAM = slots(3).name;
+      PW3HP = %trim(%char(slots(3).hp)) + '/'
+            + %trim(%char(slots(3).mx));
+      if slots(3).hp <= 0;
+        PW3FNT = '1';
+        *in92 = *on;
+      else;
+        PW3FNT = ' ';
+        *in92 = *off;
+      endif;
+    else;
+      PW3NAM = *blanks;
+      PW3HP = *blanks;
+      PW3FNT = ' ';
+      *in92 = *off;
+    endif;
+
+    // Slot 4
+    if slots(4).present;
+      PW4NAM = slots(4).name;
+      PW4HP = %trim(%char(slots(4).hp)) + '/'
+            + %trim(%char(slots(4).mx));
+      if slots(4).hp <= 0;
+        PW4FNT = '1';
+        *in93 = *on;
+      else;
+        PW4FNT = ' ';
+        *in93 = *off;
+      endif;
+    else;
+      PW4NAM = *blanks;
+      PW4HP = *blanks;
+      PW4FNT = ' ';
+      *in93 = *off;
+    endif;
+
+    // Slot 5
+    if slots(5).present;
+      PW5NAM = slots(5).name;
+      PW5HP = %trim(%char(slots(5).hp)) + '/'
+            + %trim(%char(slots(5).mx));
+      if slots(5).hp <= 0;
+        PW5FNT = '1';
+        *in94 = *on;
+      else;
+        PW5FNT = ' ';
+        *in94 = *off;
+      endif;
+    else;
+      PW5NAM = *blanks;
+      PW5HP = *blanks;
+      PW5FNT = ' ';
+      *in94 = *off;
+    endif;
+
+    // Slot 6
+    if slots(6).present;
+      PW6NAM = slots(6).name;
+      PW6HP = %trim(%char(slots(6).hp)) + '/'
+            + %trim(%char(slots(6).mx));
+      if slots(6).hp <= 0;
+        PW6FNT = '1';
+        *in95 = *on;
+      else;
+        PW6FNT = ' ';
+        *in95 = *off;
+      endif;
+    else;
+      PW6NAM = *blanks;
+      PW6HP = *blanks;
+      PW6FNT = ' ';
+      *in95 = *off;
+    endif;
+
+    exfmt PKMNWIN;
+    if *in12;
+      return 0;
+    endif;
+
+    choice = CursorToSlotIdx(SWROW : SWCOL);
+    if choice < 1 or choice > 6;
+      iter;
+    endif;
+    if not slots(choice).present;
+      ShowMsg('Empty slot.');
+      iter;
+    endif;
+    if slots(choice).hp <= 0;
+      ShowMsg('Can''t send out a fainted Pokemon!');
+      iter;
+    endif;
+    if slots(choice).active = 'Y';
+      ShowMsg('Already in battle!');
       iter;
     endif;
 
