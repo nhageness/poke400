@@ -212,16 +212,7 @@ dcl-s seedDmg int(5);
 dcl-s enmyFainted ind;
 
 // Switch menu work variables
-dcl-s swSlot  int(5) dim(6);
-dcl-s swName  char(12) dim(6);
-dcl-s swCurHP int(5) dim(6);
-dcl-s swMaxHP int(5) dim(6);
-dcl-s swCount int(5);
 dcl-s swChoice int(5);
-dcl-s wSlot   int(5);
-dcl-s wSName  char(12);
-dcl-s wSCurHP int(5);
-dcl-s wSMaxHP int(5);
 
 // SQL work variables for move loading
 dcl-s wMvId  int(5);
