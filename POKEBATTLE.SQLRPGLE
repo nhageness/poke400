@@ -408,6 +408,58 @@ dow battleOn;
     if not battleOn;
       leave;
     endif;
+
+    // MP switch priority: apply voluntary switches before attacks
+    if turnAction = 'S' and enmyAction = 'S';
+      // Both switching - order by Speed of the OUTGOING active mon
+      if plyr.speed > enmy.speed;
+        firstSwitcher = pPlayer;
+      elseif plyr.speed < enmy.speed;
+        firstSwitcher = enmyPlayer;
+      else;
+        exec sql SET :randVal = RAND();
+        if randVal < 0.5;
+          firstSwitcher = pPlayer;
+        else;
+          firstSwitcher = enmyPlayer;
+        endif;
+      endif;
+
+      if firstSwitcher = pPlayer;
+        vswSide = 'P';
+        vswNewSlot = switchSlot;
+        exsr ApplyVoluntarySwitch;
+        vswSide = 'E';
+        vswNewSlot = enmySwitchSlot;
+        exsr ApplyVoluntarySwitch;
+      else;
+        vswSide = 'E';
+        vswNewSlot = enmySwitchSlot;
+        exsr ApplyVoluntarySwitch;
+        vswSide = 'P';
+        vswNewSlot = switchSlot;
+        exsr ApplyVoluntarySwitch;
+      endif;
+
+      // No attacks happen on a double-switch turn
+      plyrSkipAttack = *on;
+      enmySkipAttack = *on;
+
+    elseif turnAction = 'S';
+      // Only player switches - goes first, opponent attacks new mon
+      vswSide = 'P';
+      vswNewSlot = switchSlot;
+      exsr ApplyVoluntarySwitch;
+      plyrSkipAttack = *on;
+
+    elseif enmyAction = 'S';
+      // Only opponent switches - goes first, player attacks new mon
+      vswSide = 'E';
+      vswNewSlot = enmySwitchSlot;
+      exsr ApplyVoluntarySwitch;
+      enmySkipAttack = *on;
+
+    endif;
   endif;
 
   exsr ResolveTurn;
