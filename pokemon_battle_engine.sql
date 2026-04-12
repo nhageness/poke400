@@ -283,6 +283,7 @@ CREATE OR REPLACE TABLE NHAGENCO1.POKEDEX (
     SP_ATK      SMALLINT       NOT NULL,      -- Gen 1: "Special" for both
     SP_DEF      SMALLINT       NOT NULL,      -- Gen 1: same as SP_ATK
     SPEED       SMALLINT       NOT NULL,
+    COLOR       SMALLINT       NOT NULL DEFAULT 1,  -- 1=GRN 2=WHT 3=RED 4=TRQ 5=YLW 6=PNK 7=BLU
     ASCII_ART   VARCHAR(500),                 -- '#'-delimited, single-line (see note by inserts)
     BATTLE_CRY  VARCHAR(30),                  -- text displayed on entry
     PRIMARY KEY (PKMN_ID),
@@ -304,72 +305,72 @@ CREATE OR REPLACE TABLE NHAGENCO1.POKEDEX (
 -- ============================================================
 
 -- Starters & evolutions
-INSERT INTO NHAGENCO1.POKEDEX VALUES (1, 'BULBASAUR', 5, 8, 45, 49, 49, 65, 65, 45,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (1, 'BULBASAUR', 5, 8, 45, 49, 49, 65, 65, 45, 1,
     '    _    #   / \   #  / o \  # /   __\  ##  (__ \ # \ \___) ##  \____/ #   \__/',
     'Bulba!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (2, 'IVYSAUR', 5, 8, 60, 62, 63, 80, 80, 60,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (2, 'IVYSAUR', 5, 8, 60, 62, 63, 80, 80, 60, 1,
     '   \_/\_  #  (o  o) #  / _  \  # / / \  \ ##(__) \  ##  \___/  #   \__/',
     'Ivy!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (3, 'VENUSAUR', 5, 8, 80, 82, 83, 100, 100, 80,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (3, 'VENUSAUR', 5, 8, 80, 82, 83, 100, 100, 80, 1,
     '  \\ __ // # \\(  )/  #  ( oo ) # _/ /\ \_ #(__)(__)# /  /  \  \#/__/\__\#',
     'VENUSAUR!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (4, 'CHARMANDER', 2, NULL, 39, 52, 43, 60, 50, 65,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (4, 'CHARMANDER', 2, NULL, 39, 52, 43, 60, 50, 65, 3,
     '       _ #      ( ) #   (\/)  #   /  \  #  ( oo ) #  _\  /_ # (_/  \_)#      *~',
     'Char!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (5, 'CHARMELEON', 2, NULL, 58, 64, 58, 80, 65, 80,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (5, 'CHARMELEON', 2, NULL, 58, 64, 58, 80, 65, 80, 3,
     '      _  #    _( )_ #   (\/)  #  / oo \  # ( \__/ )# _/ /\ \_#(__)(__)# *~~',
     'CHARR!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (6, 'CHARIZARD', 2, 10, 78, 84, 78, 109, 85, 100,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (6, 'CHARIZARD', 2, 10, 78, 84, 78, 109, 85, 100, 3,
     '     /\  /\ #    \/\/   #   (oo)   #  _/    \_ # / /\  /\ \## /(__)(__)\##*~~~  \__#',
     'RAAAWR!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (7, 'SQUIRTLE', 3, NULL, 44, 48, 65, 50, 64, 43,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (7, 'SQUIRTLE', 3, NULL, 44, 48, 65, 50, 64, 43, 7,
     '    _____  #   /     \ #  | o   o|#  |   ^  |#   \  --- / #    \_____/#     |_|_|',
     'Squirtle!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (8, 'WARTORTLE', 3, NULL, 59, 63, 80, 65, 80, 58,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (8, 'WARTORTLE', 3, NULL, 59, 63, 80, 65, 80, 58, 7,
     '    _____  #  //     \\# |  o   o|#  |   ^  |#   \  === / #  ~~\_____/#     |_|_|',
     'WARR!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (9, 'BLASTOISE', 3, NULL, 79, 83, 100, 85, 105, 78,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (9, 'BLASTOISE', 3, NULL, 79, 83, 100, 85, 105, 78, 7,
     '  |=|   |=|#   _____   #  / o o \ # |   ^   |#  \ === /  #   \_____/ # __|_|_|__#',
     'BLAST!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (25, 'PIKACHU', 4, NULL, 35, 55, 30, 50, 40, 90,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (25, 'PIKACHU', 4, NULL, 35, 55, 30, 50, 40, 90, 5,
     '  |\  /| #  \ \/ / #   (oo)  #  _/  \_ # / \__/ \## \____/ #    ||',
     'Pika!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (26, 'RAICHU', 4, NULL, 60, 90, 55, 90, 80, 100,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (26, 'RAICHU', 4, NULL, 60, 90, 55, 90, 80, 100, 5,
     '   /|  |\ #  / \/ \ #  ( oo ) #  _/  \_ #  / __ \ # | (__) |# \______/#   )__(',
     'RAIIII!');
 
 -- Popular Gen 1 Pokemon
-INSERT INTO NHAGENCO1.POKEDEX VALUES (94, 'GENGAR', 14, 8, 60, 65, 60, 130, 75, 110,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (94, 'GENGAR', 14, 8, 60, 65, 60, 130, 75, 110, 6,
     '   /\  /\ #  /  \/  \# |  ^  ^ |# | \  w / |#  \____/ #   \    / #    \__/',
     'Kekeke!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (130, 'GYARADOS', 3, 10, 95, 125, 79, 60, 100, 81,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (130, 'GYARADOS', 3, 10, 95, 125, 79, 60, 100, 81, 7,
     '     ___  #    /   | #   / oo | #  |  >> | #   \___/  #    |  \\  #    | ~~~#   ~~~~',
     'GRAAAH!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (143, 'SNORLAX', 1, NULL, 160, 110, 65, 65, 110, 30,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (143, 'SNORLAX', 1, NULL, 160, 110, 65, 65, 110, 30, 2,
     '   _____ #  /     \ # | x   x |#  |  __  |#  | /  \ |#   \____/ #  __|    |_#',
     '...Zzz...');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (149, 'DRAGONITE', 15, 10, 91, 134, 95, 100, 100, 80,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (149, 'DRAGONITE', 15, 10, 91, 134, 95, 100, 100, 80, 5,
     '    /\ /\ #   (    ) #   (oo)  #  _/  \_ # / \  / \##  ( __ ) ## \__/\__/#',
     'DRAAA!');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (150, 'MEWTWO', 11, NULL, 106, 110, 90, 154, 90, 130,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (150, 'MEWTWO', 11, NULL, 106, 110, 90, 154, 90, 130, 6,
     '    ___   #   /   |  #  | o o | #  |  _  | #   \   / #    | |   #   _| |_  #  (___|',
     '......');
 
-INSERT INTO NHAGENCO1.POKEDEX VALUES (151, 'MEW', 11, NULL, 100, 100, 100, 100, 100, 100,
+INSERT INTO NHAGENCO1.POKEDEX VALUES (151, 'MEW', 11, NULL, 100, 100, 100, 100, 100, 100, 6,
     '   ___  #  (   ) #  ( o ) # /(   )\# \  ^  /#  \   / #   \_/',
     'Mew!');
 

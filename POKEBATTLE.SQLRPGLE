@@ -66,6 +66,7 @@ dcl-ds pkmn_t qualified template;
   accStg  int(5);
   seeded  ind;
   baseSpd int(5);
+  color   int(5);
 end-ds;
 
 dcl-ds dmg_t qualified template;
@@ -742,6 +743,34 @@ begsr RefreshEnemy;
   endif;
   ParseArt(enmy.art : OPART1 : OPART2 : OPART3 : OPART4 : OPART5
                      : OPART6 : OPART7 : OPART8 : OPART9 : OPARTA);
+
+  // Opponent color indicators: 40=GRN 41=WHT 42=RED 43=TRQ 44=YLW 45=PNK 46=BLU
+  *in40 = *off;
+  *in41 = *off;
+  *in42 = *off;
+  *in43 = *off;
+  *in44 = *off;
+  *in45 = *off;
+  *in46 = *off;
+  select;
+    when enmy.color = 1;
+      *in40 = *on;
+    when enmy.color = 2;
+      *in41 = *on;
+    when enmy.color = 3;
+      *in42 = *on;
+    when enmy.color = 4;
+      *in43 = *on;
+    when enmy.color = 5;
+      *in44 = *on;
+    when enmy.color = 6;
+      *in45 = *on;
+    when enmy.color = 7;
+      *in46 = *on;
+    other;
+      *in40 = *on;
+  endsl;
+
   write OPPONENT;
 endsr;
 
@@ -764,6 +793,34 @@ begsr RefreshPlayer;
   endif;
   ParseArt(plyr.art : PLART1 : PLART2 : PLART3 : PLART4 : PLART5
                      : PLART6 : PLART7 : PLART8 : PLART9 : PLARTA);
+
+  // Player color indicators: 30=GRN 31=WHT 32=RED 33=TRQ 34=YLW 35=PNK 36=BLU
+  *in30 = *off;
+  *in31 = *off;
+  *in32 = *off;
+  *in33 = *off;
+  *in34 = *off;
+  *in35 = *off;
+  *in36 = *off;
+  select;
+    when plyr.color = 1;
+      *in30 = *on;
+    when plyr.color = 2;
+      *in31 = *on;
+    when plyr.color = 3;
+      *in32 = *on;
+    when plyr.color = 4;
+      *in33 = *on;
+    when plyr.color = 5;
+      *in34 = *on;
+    when plyr.color = 6;
+      *in35 = *on;
+    when plyr.color = 7;
+      *in36 = *on;
+    other;
+      *in30 = *on;
+  endsl;
+
   write PLAYER;
 endsr;
 
@@ -1385,6 +1442,7 @@ dcl-proc LoadActivePkmn;
   dcl-s wSpeed int(5);
   dcl-s wCry   char(30);
   dcl-s wArt   varchar(500);
+  dcl-s wColor int(5);
   dcl-s wCurHP int(5);
   dcl-s wMaxHP int(5);
   dcl-s wLevel int(5);
@@ -1432,7 +1490,7 @@ dcl-proc LoadActivePkmn;
     SELECT bp.PKMN_ID, p.PKMN_NAME, p.TYPE1,
            p.TYPE2, t1.TYPE_NAME, t2.TYPE_NAME,
            p.HP, p.ATTACK, p.DEFENSE,
-           p.SP_ATK, p.SP_DEF, p.SPEED,
+           p.SP_ATK, p.SP_DEF, p.SPEED, p.COLOR,
            p.BATTLE_CRY, p.ASCII_ART,
            bp.CURRENT_HP, bp.MAX_HP, bp.LEVEL, bp.TEAM_SLOT,
            bp.MOVE1, bp.MOVE2, bp.MOVE3, bp.MOVE4,
@@ -1441,7 +1499,7 @@ dcl-proc LoadActivePkmn;
       INTO :wId, :wName, :wT1,
            :wT2 :niT2, :wT1nm, :wT2nm :niT2nm,
            :wHP, :wAtk, :wDef,
-           :wSpA, :wSpD, :wSpeed,
+           :wSpA, :wSpD, :wSpeed, :wColor,
            :wCry :niCry, :wArt :niArt,
            :wCurHP, :wMaxHP, :wLevel, :wTeamSlot,
            :wMv1 :niMv1, :wMv2 :niMv2,
@@ -1487,6 +1545,7 @@ dcl-proc LoadActivePkmn;
   ds.maxHp = wMaxHP;
   ds.slot = wTeamSlot;
   ds.status = wStatus;
+  ds.color = wColor;
 
   ds.atk = (wAtk * 2 * wLevel) / 100 + 5;
   ds.def = (wDef * 2 * wLevel) / 100 + 5;
