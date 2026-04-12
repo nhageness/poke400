@@ -549,7 +549,9 @@ dow battleOn;
     exec sql
       UPDATE NHAGENCO1.BATTLE_SESSION
          SET TURN_STATE = 'P1_PICK',
-             P1_MOVE = NULL, P2_MOVE = NULL
+             P1_MOVE = NULL, P2_MOVE = NULL,
+             P1_ACTION = NULL, P2_ACTION = NULL,
+             P1_SWITCH_SLOT = NULL, P2_SWITCH_SLOT = NULL
        WHERE ROOM_CODE = :pRoomCode;
   endif;
 
@@ -653,63 +655,95 @@ endsr;
 
 // --- MP: Exchange moves with opponent ---
 begsr MPExchangeMoves;
-  // Write our move to session
+  // Write our action (move or switch) to session
   if pPlayer = 1;
-    wP1Move = plyr.moves(moveChoice).id;
+    if turnAction = 'M';
+      wP1Action = 'M';
+      wP1Move = plyr.moves(moveChoice).id;
+      wP1Switch = 0;
+    else;
+      wP1Action = 'S';
+      wP1Move = 0;
+      wP1Switch = switchSlot;
+    endif;
     exec sql
       UPDATE NHAGENCO1.BATTLE_SESSION
-         SET P1_MOVE = :wP1Move
+         SET P1_ACTION = :wP1Action,
+             P1_MOVE = :wP1Move,
+             P1_SWITCH_SLOT = :wP1Switch
        WHERE ROOM_CODE = :pRoomCode;
   else;
-    wP2Move = plyr.moves(moveChoice).id;
+    if turnAction = 'M';
+      wP2Action = 'M';
+      wP2Move = plyr.moves(moveChoice).id;
+      wP2Switch = 0;
+    else;
+      wP2Action = 'S';
+      wP2Move = 0;
+      wP2Switch = switchSlot;
+    endif;
     exec sql
       UPDATE NHAGENCO1.BATTLE_SESSION
-         SET P2_MOVE = :wP2Move
+         SET P2_ACTION = :wP2Action,
+             P2_MOVE = :wP2Move,
+             P2_SWITCH_SLOT = :wP2Switch
        WHERE ROOM_CODE = :pRoomCode;
   endif;
 
   ShowMsg('Waiting for opponent...');
 
-  // Poll until opponent's move is set
+  // Poll until opponent's action is set
   if pPlayer = 1;
-    wP2Move = 0;
-    dow wP2Move = 0;
+    wP2Action = ' ';
+    dow wP2Action = ' ';
       Delay(1);
       exec sql
-        SELECT COALESCE(P2_MOVE, 0) INTO :wP2Move
+        SELECT COALESCE(P2_ACTION, ' '),
+               COALESCE(P2_MOVE, 0),
+               COALESCE(P2_SWITCH_SLOT, 0)
+          INTO :wP2Action, :wP2Move, :wP2Switch
           FROM NHAGENCO1.BATTLE_SESSION
          WHERE ROOM_CODE = :pRoomCode;
     enddo;
+    enmyAction = wP2Action;
+    enmySwitchSlot = wP2Switch;
   else;
-    wP1Move = 0;
-    dow wP1Move = 0;
+    wP1Action = ' ';
+    dow wP1Action = ' ';
       Delay(1);
       exec sql
-        SELECT COALESCE(P1_MOVE, 0) INTO :wP1Move
+        SELECT COALESCE(P1_ACTION, ' '),
+               COALESCE(P1_MOVE, 0),
+               COALESCE(P1_SWITCH_SLOT, 0)
+          INTO :wP1Action, :wP1Move, :wP1Switch
           FROM NHAGENCO1.BATTLE_SESSION
          WHERE ROOM_CODE = :pRoomCode;
     enddo;
+    enmyAction = wP1Action;
+    enmySwitchSlot = wP1Switch;
   endif;
 
-  // Find opponent's move index from their active Pokemon
+  // Find opponent's move index only when they chose to attack
   enmyMoveIdx = 0;
-  if pPlayer = 1;
-    for i = 1 to 4;
-      if enmy.moves(i).id = wP2Move;
-        enmyMoveIdx = i;
-        leave;
-      endif;
-    endfor;
-  else;
-    for i = 1 to 4;
-      if enmy.moves(i).id = wP1Move;
-        enmyMoveIdx = i;
-        leave;
-      endif;
-    endfor;
-  endif;
-  if enmyMoveIdx = 0;
-    enmyMoveIdx = 1;
+  if enmyAction = 'M';
+    if pPlayer = 1;
+      for i = 1 to 4;
+        if enmy.moves(i).id = wP2Move;
+          enmyMoveIdx = i;
+          leave;
+        endif;
+      endfor;
+    else;
+      for i = 1 to 4;
+        if enmy.moves(i).id = wP1Move;
+          enmyMoveIdx = i;
+          leave;
+        endif;
+      endfor;
+    endif;
+    if enmyMoveIdx = 0;
+      enmyMoveIdx = 1;
+    endif;
   endif;
 
   // P1 generates random rolls and speed order
