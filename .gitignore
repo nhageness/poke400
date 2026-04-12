@@ -13,3 +13,7 @@ pub400_run_sql.js
 node_modules/
 package.json
 package-lock.json
+
+# Local-only (not shared to GitHub)
+tools/
+docs/
