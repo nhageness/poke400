@@ -317,19 +317,15 @@
      A                                      CA12(12 'F12=Back')
      A            MVROW          3S 0H
      A            MVCOL          3S 0H
-     A            MV1TGT         1A  I  2  2DSPATR(ND)
+     A            MV1NAM        16A  B  2  3DSPATR(PR)
      A                                      DSPATR(PC)
-     A            MV1NAM        16A  O  2  3
-     A            MV1PP          7A  O  2 20
-     A            MV2TGT         1A  I  2 30DSPATR(ND)
-     A            MV2NAM        16A  O  2 31
-     A            MV2PP          7A  O  2 48
-     A            MV3TGT         1A  I  3  2DSPATR(ND)
-     A            MV3NAM        16A  O  3  3
-     A            MV3PP          7A  O  3 20
-     A            MV4TGT         1A  I  3 30DSPATR(ND)
-     A            MV4NAM        16A  O  3 31
-     A            MV4PP          7A  O  3 48
+     A            MV1PP          7A  O  2 22
+     A            MV2NAM        16A  B  2 31DSPATR(PR)
+     A            MV2PP          7A  O  2 50
+     A            MV3NAM        16A  B  3  3DSPATR(PR)
+     A            MV3PP          7A  O  3 22
+     A            MV4NAM        16A  B  3 31DSPATR(PR)
+     A            MV4PP          7A  O  3 50
      A                                  5  2'Move cursor, Enter=Pick -
      A                                      F12=Back'
      A                                      DSPATR(HI)
@@ -366,13 +362,11 @@
      A            ACTCOL         3S 0H
      A                                 25  5'What will you do?'
      A                                      DSPATR(HI)
-     A            ACTFGT         1A  I 26  9DSPATR(ND)
+     A            ACTFGT         5A  B 26 10DSPATR(HI)
+     A                                      DSPATR(PR)
      A                                      DSPATR(PC)
-     A                                 26 10'FIGHT'
-     A                                      DSPATR(HI)
-     A            ACTPKM         1A  I 26 29DSPATR(ND)
-     A                                 26 30'PKMN'
-     A                                      DSPATR(HI)
+     A            ACTPKM         4A  B 26 30DSPATR(HI)
+     A                                      DSPATR(PR)
      A                                 25 50'Move cursor, Enter=Pick'
      A                                      DSPATR(HI)
      A*
@@ -391,34 +385,22 @@
      A            SWCOL          3S 0H
      A                                  1  2'Choose a Pokemon:'
      A                                      DSPATR(HI)
-     A            PW1TGT         1A  I  3  2DSPATR(ND)
+     A            PW1NAM        12A  B  3  3DSPATR(PR)
      A                                      DSPATR(PC)
-     A            PW1NAM        12A  O  3  3
-     A            PW1HP          7A  O  3 16
-     A            PW1FNT         1A  O  3 24DSPATR(ND)
      A  90                                  DSPATR(HI RI)
-     A            PW2TGT         1A  I  3 25DSPATR(ND)
-     A            PW2NAM        12A  O  3 26
-     A            PW2HP          7A  O  3 39
-     A            PW2FNT         1A  O  3 47DSPATR(ND)
+     A            PW1HP          7A  O  3 18
+     A            PW2NAM        12A  B  3 26DSPATR(PR)
      A  91                                  DSPATR(HI RI)
-     A            PW3TGT         1A  I  5  2DSPATR(ND)
-     A            PW3NAM        12A  O  5  3
-     A            PW3HP          7A  O  5 16
-     A            PW3FNT         1A  O  5 24DSPATR(ND)
+     A            PW2HP          7A  O  3 41
+     A            PW3NAM        12A  B  5  3DSPATR(PR)
      A  92                                  DSPATR(HI RI)
-     A            PW4TGT         1A  I  5 25DSPATR(ND)
-     A            PW4NAM        12A  O  5 26
-     A            PW4HP          7A  O  5 39
-     A            PW4FNT         1A  O  5 47DSPATR(ND)
+     A            PW3HP          7A  O  5 18
+     A            PW4NAM        12A  B  5 26DSPATR(PR)
      A  93                                  DSPATR(HI RI)
-     A            PW5TGT         1A  I  7  2DSPATR(ND)
-     A            PW5NAM        12A  O  7  3
-     A            PW5HP          7A  O  7 16
-     A            PW5FNT         1A  O  7 24DSPATR(ND)
+     A            PW4HP          7A  O  5 41
+     A            PW5NAM        12A  B  7  3DSPATR(PR)
      A  94                                  DSPATR(HI RI)
-     A            PW6TGT         1A  I  7 25DSPATR(ND)
-     A            PW6NAM        12A  O  7 26
-     A            PW6HP          7A  O  7 39
-     A            PW6FNT         1A  O  7 47DSPATR(ND)
+     A            PW5HP          7A  O  7 18
+     A            PW6NAM        12A  B  7 26DSPATR(PR)
      A  95                                  DSPATR(HI RI)
+     A            PW6HP          7A  O  7 41

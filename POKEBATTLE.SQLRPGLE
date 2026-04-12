@@ -325,6 +325,8 @@ dow battleOn;
   turnAction = ' ';
   switchSlot = 0;
   dow not actionPicked;
+    ACTFGT = 'FIGHT';
+    ACTPKM = 'PKMN';
     exfmt ACTMENU;
     if *in03;
       leave;
@@ -2387,16 +2389,13 @@ dcl-proc PickSwitchVoluntary;
       PW1HP = %trim(%char(slots(1).hp)) + '/'
             + %trim(%char(slots(1).mx));
       if slots(1).hp <= 0;
-        PW1FNT = '1';
         *in90 = *on;
       else;
-        PW1FNT = ' ';
         *in90 = *off;
       endif;
     else;
       PW1NAM = *blanks;
       PW1HP = *blanks;
-      PW1FNT = ' ';
       *in90 = *off;
     endif;
 
@@ -2406,16 +2405,13 @@ dcl-proc PickSwitchVoluntary;
       PW2HP = %trim(%char(slots(2).hp)) + '/'
             + %trim(%char(slots(2).mx));
       if slots(2).hp <= 0;
-        PW2FNT = '1';
         *in91 = *on;
       else;
-        PW2FNT = ' ';
         *in91 = *off;
       endif;
     else;
       PW2NAM = *blanks;
       PW2HP = *blanks;
-      PW2FNT = ' ';
       *in91 = *off;
     endif;
 
@@ -2425,16 +2421,13 @@ dcl-proc PickSwitchVoluntary;
       PW3HP = %trim(%char(slots(3).hp)) + '/'
             + %trim(%char(slots(3).mx));
       if slots(3).hp <= 0;
-        PW3FNT = '1';
         *in92 = *on;
       else;
-        PW3FNT = ' ';
         *in92 = *off;
       endif;
     else;
       PW3NAM = *blanks;
       PW3HP = *blanks;
-      PW3FNT = ' ';
       *in92 = *off;
     endif;
 
@@ -2444,16 +2437,13 @@ dcl-proc PickSwitchVoluntary;
       PW4HP = %trim(%char(slots(4).hp)) + '/'
             + %trim(%char(slots(4).mx));
       if slots(4).hp <= 0;
-        PW4FNT = '1';
         *in93 = *on;
       else;
-        PW4FNT = ' ';
         *in93 = *off;
       endif;
     else;
       PW4NAM = *blanks;
       PW4HP = *blanks;
-      PW4FNT = ' ';
       *in93 = *off;
     endif;
 
@@ -2463,16 +2453,13 @@ dcl-proc PickSwitchVoluntary;
       PW5HP = %trim(%char(slots(5).hp)) + '/'
             + %trim(%char(slots(5).mx));
       if slots(5).hp <= 0;
-        PW5FNT = '1';
         *in94 = *on;
       else;
-        PW5FNT = ' ';
         *in94 = *off;
       endif;
     else;
       PW5NAM = *blanks;
       PW5HP = *blanks;
-      PW5FNT = ' ';
       *in94 = *off;
     endif;
 
@@ -2482,16 +2469,13 @@ dcl-proc PickSwitchVoluntary;
       PW6HP = %trim(%char(slots(6).hp)) + '/'
             + %trim(%char(slots(6).mx));
       if slots(6).hp <= 0;
-        PW6FNT = '1';
         *in95 = *on;
       else;
-        PW6FNT = ' ';
         *in95 = *off;
       endif;
     else;
       PW6NAM = *blanks;
       PW6HP = *blanks;
-      PW6FNT = ' ';
       *in95 = *off;
     endif;
 
