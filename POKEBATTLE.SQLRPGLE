@@ -166,6 +166,10 @@ dcl-pr CursorToSlotIdx int(10);
   col int(10) const;
 end-pr;
 
+// Voluntary action picker procedures
+dcl-pr PickMove int(10);
+end-pr;
+
 // ----- Global Variables -----
 dcl-ds plyr likeds(pkmn_t) inz;
 dcl-ds enmy likeds(pkmn_t) inz;
@@ -2098,4 +2102,49 @@ dcl-proc CursorToSlotIdx;
     return rowIdx + 2;
   endif;
   return 0;
+end-proc;
+
+// -------------------------------------------------------------
+// PickMove - Display MOVEMENU popup, return chosen move 1-4 or 0
+// -------------------------------------------------------------
+dcl-proc PickMove;
+  dcl-pi *n int(10);
+  end-pi;
+  dcl-s choice int(10);
+
+  dow *on;
+    MV1NAM = plyr.moves(1).name;
+    MV1PP = %trim(%char(plyr.moves(1).curPP)) + '/'
+          + %trim(%char(plyr.moves(1).pp));
+    MV2NAM = plyr.moves(2).name;
+    MV2PP = %trim(%char(plyr.moves(2).curPP)) + '/'
+          + %trim(%char(plyr.moves(2).pp));
+    MV3NAM = plyr.moves(3).name;
+    MV3PP = %trim(%char(plyr.moves(3).curPP)) + '/'
+          + %trim(%char(plyr.moves(3).pp));
+    MV4NAM = plyr.moves(4).name;
+    MV4PP = %trim(%char(plyr.moves(4).curPP)) + '/'
+          + %trim(%char(plyr.moves(4).pp));
+
+    exfmt MOVEMENU;
+    if *in12;
+      return 0;
+    endif;
+
+    choice = CursorToMoveIdx(MVROW : MVCOL);
+    if choice < 1 or choice > 4;
+      iter;
+    endif;
+
+    if plyr.moves(choice).id = 0;
+      ShowMsg('No move.');
+      iter;
+    endif;
+    if plyr.moves(choice).curPP <= 0;
+      ShowMsg('No PP left!');
+      iter;
+    endif;
+
+    return choice;
+  enddo;
 end-proc;
