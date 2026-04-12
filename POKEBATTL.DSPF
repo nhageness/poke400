@@ -317,14 +317,14 @@
      A                                      CA12(12 'F12=Back')
      A            CSRRCD        10A  H
      A            CSRFLD        10A  H
-     A            MV1NAM        16A  B  2  3DSPATR(PR)
+     A            MV1NAM        16A  B  2  3
      A                                      DSPATR(PC)
      A            MV1PP          7A  O  2 22
-     A            MV2NAM        16A  B  2 31DSPATR(PR)
+     A            MV2NAM        16A  B  2 31
      A            MV2PP          7A  O  2 50
-     A            MV3NAM        16A  B  3  3DSPATR(PR)
+     A            MV3NAM        16A  B  3  3
      A            MV3PP          7A  O  3 22
-     A            MV4NAM        16A  B  3 31DSPATR(PR)
+     A            MV4NAM        16A  B  3 31
      A            MV4PP          7A  O  3 50
      A                                  5  2'Move cursor, Enter=Pick -
      A                                      F12=Back'
@@ -363,10 +363,10 @@
      A                                 25  5'What will you do?'
      A                                      DSPATR(HI)
      A            ACTFGT         5A  B 26 10DSPATR(HI)
-     A                                      DSPATR(PR)
+     A
      A                                      DSPATR(PC)
      A            ACTPKM         4A  B 26 30DSPATR(HI)
-     A                                      DSPATR(PR)
+     A
      A                                 25 50'Move cursor, Enter=Pick'
      A                                      DSPATR(HI)
      A*
@@ -385,22 +385,22 @@
      A            CSRFLD        10A  H
      A                                  1  2'Choose a Pokemon:'
      A                                      DSPATR(HI)
-     A            PW1NAM        12A  B  3  3DSPATR(PR)
+     A            PW1NAM        12A  B  3  3
      A                                      DSPATR(PC)
      A  90                                  DSPATR(HI RI)
      A            PW1HP          7A  O  3 18
-     A            PW2NAM        12A  B  3 26DSPATR(PR)
+     A            PW2NAM        12A  B  3 26
      A  91                                  DSPATR(HI RI)
      A            PW2HP          7A  O  3 41
-     A            PW3NAM        12A  B  5  3DSPATR(PR)
+     A            PW3NAM        12A  B  5  3
      A  92                                  DSPATR(HI RI)
      A            PW3HP          7A  O  5 18
-     A            PW4NAM        12A  B  5 26DSPATR(PR)
+     A            PW4NAM        12A  B  5 26
      A  93                                  DSPATR(HI RI)
      A            PW4HP          7A  O  5 41
-     A            PW5NAM        12A  B  7  3DSPATR(PR)
+     A            PW5NAM        12A  B  7  3
      A  94                                  DSPATR(HI RI)
      A            PW5HP          7A  O  7 18
-     A            PW6NAM        12A  B  7 26DSPATR(PR)
+     A            PW6NAM        12A  B  7 26
      A  95                                  DSPATR(HI RI)
      A            PW6HP          7A  O  7 41
