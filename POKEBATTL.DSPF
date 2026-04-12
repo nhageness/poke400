@@ -362,11 +362,13 @@
      A            CSRFLD        10A  H
      A                                 25  5'What will you do?'
      A                                      DSPATR(HI)
-     A            ACTFGT         5A  B 26 10DSPATR(HI)
-     A
+     A            CURFGT         1A  B 26 10DSPATR(HI)
      A                                      DSPATR(PC)
-     A            ACTPKM         4A  B 26 30DSPATR(HI)
-     A
+     A                                 26 11'FIGHT'
+     A                                      DSPATR(HI)
+     A            CURPKM         1A  B 26 30DSPATR(HI)
+     A                                 26 31'PKMN'
+     A                                      DSPATR(HI)
      A                                 25 50'Move cursor, Enter=Pick'
      A                                      DSPATR(HI)
      A*
