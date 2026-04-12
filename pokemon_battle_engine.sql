@@ -284,7 +284,7 @@ CREATE OR REPLACE TABLE NHAGENCO1.POKEDEX (
     SP_DEF      SMALLINT       NOT NULL,      -- Gen 1: same as SP_ATK
     SPEED       SMALLINT       NOT NULL,
     COLOR       SMALLINT       NOT NULL DEFAULT 1,  -- 1=GRN 2=WHT 3=RED 4=TRQ 5=YLW 6=PNK 7=BLU
-    ASCII_ART   VARCHAR(500),                 -- '#'-delimited, single-line (see note by inserts)
+    ASCII_ART   VARCHAR(500) CCSID 37,        -- '#'-delimited, single-line, CCSID 37 so \ and | survive
     BATTLE_CRY  VARCHAR(30),                  -- text displayed on entry
     PRIMARY KEY (PKMN_ID),
     FOREIGN KEY (TYPE1) REFERENCES NHAGENCO1.TYPES(TYPE_ID)
@@ -326,11 +326,11 @@ INSERT INTO NHAGENCO1.POKEDEX VALUES (5, 'CHARMELEON', 2, NULL, 58, 64, 58, 80, 
     'CHARR!');
 
 INSERT INTO NHAGENCO1.POKEDEX VALUES (6, 'CHARIZARD', 2, 10, 78, 84, 78, 109, 85, 100, 3,
-    '     /\  /\ #    \/\/   #   (oo)   #  _/    \_ # / /\  /\ \## /(__)(__)\##*~~~  \__#',
+    '     /\  /\ #    /  \/  \#   (oo)   #  _/    \_ # / /\  /\ \## /(__)(__)\##*~~~  \__#',
     'RAAAWR!');
 
 INSERT INTO NHAGENCO1.POKEDEX VALUES (7, 'SQUIRTLE', 3, NULL, 44, 48, 65, 50, 64, 43, 7,
-    '    _____  #   /     \ #  | o   o|#  |   ^  |#   \  --- / #    \_____/#     |_|_|',
+    '    _____  #   /     \ #  | o   o|#  |   ^  |#   \  --- / #   \_____/ #     |_|_|',
     'Squirtle!');
 
 INSERT INTO NHAGENCO1.POKEDEX VALUES (8, 'WARTORTLE', 3, NULL, 59, 63, 80, 65, 80, 58, 7,
@@ -338,7 +338,7 @@ INSERT INTO NHAGENCO1.POKEDEX VALUES (8, 'WARTORTLE', 3, NULL, 59, 63, 80, 65, 8
     'WARR!');
 
 INSERT INTO NHAGENCO1.POKEDEX VALUES (9, 'BLASTOISE', 3, NULL, 79, 83, 100, 85, 105, 78, 7,
-    '  |=|   |=|#   _____   #  / o o \ # |   ^   |#  \ === /  #   \_____/ # __|_|_|__#',
+    '  |=|   |=|#   _____   #  / o o \ # |   ^   |#  \ === /  #  \_____/  # __|_|_|__#',
     'BLAST!');
 
 INSERT INTO NHAGENCO1.POKEDEX VALUES (25, 'PIKACHU', 4, NULL, 35, 55, 30, 50, 40, 90, 5,
@@ -367,7 +367,7 @@ INSERT INTO NHAGENCO1.POKEDEX VALUES (149, 'DRAGONITE', 15, 10, 91, 134, 95, 100
     'DRAAA!');
 
 INSERT INTO NHAGENCO1.POKEDEX VALUES (150, 'MEWTWO', 11, NULL, 106, 110, 90, 154, 90, 130, 6,
-    '    ___   #   /   |  #  | o o | #  |  _  | #   \   / #    | |   #   _| |_  #  (___|',
+    '    ___   #   /   \  #  | o o | #  |  _  | #   \   / #    | |   #   _| |_  #  (___)',
     '......');
 
 INSERT INTO NHAGENCO1.POKEDEX VALUES (151, 'MEW', 11, NULL, 100, 100, 100, 100, 100, 100, 6,

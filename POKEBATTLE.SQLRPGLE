@@ -6,7 +6,8 @@
 // Supports full teams with switching on faint.
 // =============================================================
 ctl-opt dftactgrp(*no) actgrp(*new)
-        option(*srcstmt : *nodebugio);
+        option(*srcstmt : *nodebugio)
+        ccsid(*char : *jobrunmix);
 
 exec sql SET OPTION COMMIT = *NONE;
 

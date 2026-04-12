@@ -103,8 +103,21 @@ dcl-s tId    int(5);
 // MAINLINE
 // =============================================================
 
+// Force job CCSID to 37 so backslash and pipe in DB data survive
+// SQL read -> variable -> display field -> device. Inherited by
+// POKEBATTLE since it runs in the same job.
+QCMDEXC('CHGJOB CCSID(37)' : 16);
+
 // Load roster from POKEDEX
 exsr LoadRoster;
+
+// One-time splash screen explaining terminal setup
+SPLKEY = ' ';
+exfmt SPLASH;
+if *in03;
+  *inlr = *on;
+  return;
+endif;
 
 // Main menu loop
 dow running;
