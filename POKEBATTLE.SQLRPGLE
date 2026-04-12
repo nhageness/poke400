@@ -2237,13 +2237,13 @@ dcl-proc FieldToMoveIdx;
     fld char(10) const;
   end-pi;
   select;
-    when %trim(fld) = 'MV1NAM';
+    when %trim(fld) = 'CURMV1';
       return 1;
-    when %trim(fld) = 'MV2NAM';
+    when %trim(fld) = 'CURMV2';
       return 2;
-    when %trim(fld) = 'MV3NAM';
+    when %trim(fld) = 'CURMV3';
       return 3;
-    when %trim(fld) = 'MV4NAM';
+    when %trim(fld) = 'CURMV4';
       return 4;
   endsl;
   return 0;
@@ -2295,6 +2295,10 @@ dcl-proc PickMove;
     MV4PP = %trim(%char(plyr.moves(4).curPP)) + '/'
           + %trim(%char(plyr.moves(4).pp));
 
+    CURMV1 = '>';
+    CURMV2 = '>';
+    CURMV3 = '>';
+    CURMV4 = '>';
     exfmt MOVEMENU;
     if *in12;
       return 0;

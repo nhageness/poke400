@@ -317,14 +317,18 @@
      A                                      CA12(12 'F12=Back')
      A            CSRRCD        10A  H
      A            CSRFLD        10A  H
-     A            MV1NAM        16A  B  2  3
+     A            CURMV1         1A  B  2  3DSPATR(HI)
      A                                      DSPATR(PC)
+     A            MV1NAM        16A  O  2  5
      A            MV1PP          7A  O  2 22
-     A            MV2NAM        16A  B  2 31
+     A            CURMV2         1A  B  2 31DSPATR(HI)
+     A            MV2NAM        16A  O  2 33
      A            MV2PP          7A  O  2 50
-     A            MV3NAM        16A  B  3  3
+     A            CURMV3         1A  B  3  3DSPATR(HI)
+     A            MV3NAM        16A  O  3  5
      A            MV3PP          7A  O  3 22
-     A            MV4NAM        16A  B  3 31
+     A            CURMV4         1A  B  3 31DSPATR(HI)
+     A            MV4NAM        16A  O  3 33
      A            MV4PP          7A  O  3 50
      A                                  5  2'Move cursor, Enter=Pick -
      A                                      F12=Back'
