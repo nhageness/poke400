@@ -303,22 +303,32 @@
      A            MSG3          70A  O 27  5
      A                                      OVRDTA
      A*
-     A*== MOVEMENU - Move selection (EXFMT) =======================
+     A*== MOVEMENU - Move selection popup (EXFMT) =================
+     A*  Cursor-based: arrow keys to target field, Enter to pick.
      A          R MOVEMENU
      A                                      OVERLAY
-     A                                      ERASE(MSGLINE)
-     A                                 25  5'What will you do?'
+     A                                      WINDOW(*POPUP 20 35 7 60)
+     A                                      WDWBORDER
+     A                                      CSRLOC(MVROW MVCOL)
+     A                                      CA12(12 'F12=Back')
+     A            MVROW          3S 0H
+     A            MVCOL          3S 0H
+     A            MV1TGT         1A  I  2  2DSPATR(ND)
+     A                                      DSPATR(PC)
+     A            MV1NAM        16A  O  2  3
+     A            MV1PP          7A  O  2 20
+     A            MV2TGT         1A  I  2 30DSPATR(ND)
+     A            MV2NAM        16A  O  2 31
+     A            MV2PP          7A  O  2 48
+     A            MV3TGT         1A  I  3  2DSPATR(ND)
+     A            MV3NAM        16A  O  3  3
+     A            MV3PP          7A  O  3 20
+     A            MV4TGT         1A  I  3 30DSPATR(ND)
+     A            MV4NAM        16A  O  3 31
+     A            MV4PP          7A  O  3 48
+     A                                  5  2'Move cursor, Enter=Pick -
+     A                                      F12=Back'
      A                                      DSPATR(HI)
-     A            MV1NAM        16A  O 26  5
-     A            MV1PP          7A  O 26 23
-     A            MV2NAM        16A  O 26 35
-     A            MV2PP          7A  O 26 53
-     A            MV3NAM        16A  O 27  5
-     A            MV3PP          7A  O 27 23
-     A            MV4NAM        16A  O 27 35
-     A            MV4PP          7A  O 27 53
-     A            MVSEL          1A  B 26 70
-     A                                 26 73'(1-4)'
      A*
      A*== SWITCHMN - Switch Pokemon (EXFMT) =======================
      A          R SWITCHMN
