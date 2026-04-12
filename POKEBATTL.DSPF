@@ -2,6 +2,11 @@
      A* POKEBATTL - Pokemon Battle Display File
      A* 27x132 for Mocha 5250
      A*
+     A* Layout:
+     A*   Rows  1-12  OPPONENT  info cols 5-40   art cols 91-130 (40w x 12h)
+     A*   Rows 13-24  PLAYER    art cols 5-44    info cols 91-123 (40w x 12h)
+     A*   Rows 25-27  MSG / MOVEMENU / SWITCHMN
+     A*
      A* Color indicators (set by POKEBATTLE before WRITE):
      A*   Player side (PLART*):  30=GRN 31=WHT 32=RED 33=TRQ 34=YLW 35=PNK 36=BLU
      A*   Opponent side (OPART*): 40=GRN 41=WHT 42=RED 43=TRQ 44=YLW 45=PNK 46=BLU
@@ -10,20 +15,22 @@
      A                                      DSPSIZ(27 132)
      A                                      CA03(03 'F3=Exit')
      A*
-     A*== HEADER - Row 1 (written first, clears screen) ===========
+     A*== HEADER - Empty format, writing it clears the screen =====
      A          R HEADER
-     A                                  1  2'P O K E 4 0 0   B A T T L E'
-     A                                      DSPATR(HI)
-     A            ROOMCD         8A  O  1 55
-     A            BMODE          2A  O  1 65
      A*
-     A*== OPPONENT - Rows 2-12 ====================================
-     A*  Info on LEFT, art on RIGHT (Gen 1 layout: enemy faces you)
+     A*== OPPONENT - Rows 1-12 ====================================
+     A*  Info on LEFT (cols 5-40), art on RIGHT (cols 91-130)
      A          R OPPONENT
      A                                      OVERLAY
      A                                      PUTOVR
      A                                      CLRL(*NO)
      A                                      FRCDTA
+     A                                  1  5'POKE400'
+     A                                      DSPATR(HI)
+     A            ROOMCD         8A  O  1 14
+     A                                      OVRDTA
+     A            BMODE          2A  O  1 24
+     A                                      OVRDTA
      A                                  2  5'Enemy:'
      A            OPNAME        12A  O  2 12
      A                                      OVRDTA
@@ -41,7 +48,7 @@
      A                                      OVRDTA
      A            OPSTAT        10A  O  5  5
      A                                      OVRDTA
-     A            OPART1        25A  O  3 70
+     A            OPART1        40A  O  1 91
      A                                      OVRDTA
      A  40                                  COLOR(GRN)
      A  41                                  COLOR(WHT)
@@ -50,7 +57,7 @@
      A  44                                  COLOR(YLW)
      A  45                                  COLOR(PNK)
      A  46                                  COLOR(BLU)
-     A            OPART2        25A  O  4 70
+     A            OPART2        40A  O  2 91
      A                                      OVRDTA
      A  40                                  COLOR(GRN)
      A  41                                  COLOR(WHT)
@@ -59,7 +66,7 @@
      A  44                                  COLOR(YLW)
      A  45                                  COLOR(PNK)
      A  46                                  COLOR(BLU)
-     A            OPART3        25A  O  5 70
+     A            OPART3        40A  O  3 91
      A                                      OVRDTA
      A  40                                  COLOR(GRN)
      A  41                                  COLOR(WHT)
@@ -68,7 +75,7 @@
      A  44                                  COLOR(YLW)
      A  45                                  COLOR(PNK)
      A  46                                  COLOR(BLU)
-     A            OPART4        25A  O  6 70
+     A            OPART4        40A  O  4 91
      A                                      OVRDTA
      A  40                                  COLOR(GRN)
      A  41                                  COLOR(WHT)
@@ -77,7 +84,7 @@
      A  44                                  COLOR(YLW)
      A  45                                  COLOR(PNK)
      A  46                                  COLOR(BLU)
-     A            OPART5        25A  O  7 70
+     A            OPART5        40A  O  5 91
      A                                      OVRDTA
      A  40                                  COLOR(GRN)
      A  41                                  COLOR(WHT)
@@ -86,7 +93,7 @@
      A  44                                  COLOR(YLW)
      A  45                                  COLOR(PNK)
      A  46                                  COLOR(BLU)
-     A            OPART6        25A  O  8 70
+     A            OPART6        40A  O  6 91
      A                                      OVRDTA
      A  40                                  COLOR(GRN)
      A  41                                  COLOR(WHT)
@@ -95,7 +102,7 @@
      A  44                                  COLOR(YLW)
      A  45                                  COLOR(PNK)
      A  46                                  COLOR(BLU)
-     A            OPART7        25A  O  9 70
+     A            OPART7        40A  O  7 91
      A                                      OVRDTA
      A  40                                  COLOR(GRN)
      A  41                                  COLOR(WHT)
@@ -104,7 +111,7 @@
      A  44                                  COLOR(YLW)
      A  45                                  COLOR(PNK)
      A  46                                  COLOR(BLU)
-     A            OPART8        25A  O 10 70
+     A            OPART8        40A  O  8 91
      A                                      OVRDTA
      A  40                                  COLOR(GRN)
      A  41                                  COLOR(WHT)
@@ -113,7 +120,7 @@
      A  44                                  COLOR(YLW)
      A  45                                  COLOR(PNK)
      A  46                                  COLOR(BLU)
-     A            OPART9        25A  O 11 70
+     A            OPART9        40A  O  9 91
      A                                      OVRDTA
      A  40                                  COLOR(GRN)
      A  41                                  COLOR(WHT)
@@ -122,7 +129,25 @@
      A  44                                  COLOR(YLW)
      A  45                                  COLOR(PNK)
      A  46                                  COLOR(BLU)
-     A            OPARTA        25A  O 12 70
+     A            OPARTA        40A  O 10 91
+     A                                      OVRDTA
+     A  40                                  COLOR(GRN)
+     A  41                                  COLOR(WHT)
+     A  42                                  COLOR(RED)
+     A  43                                  COLOR(TRQ)
+     A  44                                  COLOR(YLW)
+     A  45                                  COLOR(PNK)
+     A  46                                  COLOR(BLU)
+     A            OPARTB        40A  O 11 91
+     A                                      OVRDTA
+     A  40                                  COLOR(GRN)
+     A  41                                  COLOR(WHT)
+     A  42                                  COLOR(RED)
+     A  43                                  COLOR(TRQ)
+     A  44                                  COLOR(YLW)
+     A  45                                  COLOR(PNK)
+     A  46                                  COLOR(BLU)
+     A            OPARTC        40A  O 12 91
      A                                      OVRDTA
      A  40                                  COLOR(GRN)
      A  41                                  COLOR(WHT)
@@ -132,43 +157,29 @@
      A  45                                  COLOR(PNK)
      A  46                                  COLOR(BLU)
      A*
-     A*== DIVIDER - Row 13 ========================================
-     A          R DIVIDER
-     A                                      OVERLAY
-     A            DIVLIN       130A  O 13  1
-     A*
-     A*== PLAYER - Rows 14-24 =====================================
-     A*  Art on LEFT, info on RIGHT (Gen 1 layout: you see back sprite)
+     A*== PLAYER - Rows 13-24 =====================================
+     A*  Art on LEFT (cols 5-44), info on RIGHT (cols 91-123)
      A          R PLAYER
      A                                      OVERLAY
      A                                      PUTOVR
      A                                      FRCDTA
-     A            PLNAME        12A  O 14 70
+     A            PLNAME        12A  O 13 91
      A                                      OVRDTA
-     A            PLLVL          5A  O 14 83
+     A            PLLVL          5A  O 13104
      A                                      OVRDTA
-     A            PLTYPE        23A  O 15 70
+     A            PLTYPE        23A  O 14 91
      A                                      OVRDTA
-     A                                 16 70'HP:'
-     A            PLHPBR        20A  O 16 74
+     A                                 15 91'HP:'
+     A            PLHPBR        20A  O 15 95
      A                                      OVRDTA
-     A            PLCRHP         3S 0O 16 96
+     A            PLCRHP         3S 0O 15117
      A                                      OVRDTA
-     A                                 16 99'/'
-     A            PLMXHP         3S 0O 16100
+     A                                 15120'/'
+     A            PLMXHP         3S 0O 15121
      A                                      OVRDTA
-     A            PLSTAT        10A  O 17 70
+     A            PLSTAT        10A  O 16 91
      A                                      OVRDTA
-     A            PLART1        25A  O 15  5
-     A                                      OVRDTA
-     A  30                                  COLOR(GRN)
-     A  31                                  COLOR(WHT)
-     A  32                                  COLOR(RED)
-     A  33                                  COLOR(TRQ)
-     A  34                                  COLOR(YLW)
-     A  35                                  COLOR(PNK)
-     A  36                                  COLOR(BLU)
-     A            PLART2        25A  O 16  5
+     A            PLART1        40A  O 13  5
      A                                      OVRDTA
      A  30                                  COLOR(GRN)
      A  31                                  COLOR(WHT)
@@ -177,7 +188,7 @@
      A  34                                  COLOR(YLW)
      A  35                                  COLOR(PNK)
      A  36                                  COLOR(BLU)
-     A            PLART3        25A  O 17  5
+     A            PLART2        40A  O 14  5
      A                                      OVRDTA
      A  30                                  COLOR(GRN)
      A  31                                  COLOR(WHT)
@@ -186,7 +197,7 @@
      A  34                                  COLOR(YLW)
      A  35                                  COLOR(PNK)
      A  36                                  COLOR(BLU)
-     A            PLART4        25A  O 18  5
+     A            PLART3        40A  O 15  5
      A                                      OVRDTA
      A  30                                  COLOR(GRN)
      A  31                                  COLOR(WHT)
@@ -195,7 +206,7 @@
      A  34                                  COLOR(YLW)
      A  35                                  COLOR(PNK)
      A  36                                  COLOR(BLU)
-     A            PLART5        25A  O 19  5
+     A            PLART4        40A  O 16  5
      A                                      OVRDTA
      A  30                                  COLOR(GRN)
      A  31                                  COLOR(WHT)
@@ -204,7 +215,7 @@
      A  34                                  COLOR(YLW)
      A  35                                  COLOR(PNK)
      A  36                                  COLOR(BLU)
-     A            PLART6        25A  O 20  5
+     A            PLART5        40A  O 17  5
      A                                      OVRDTA
      A  30                                  COLOR(GRN)
      A  31                                  COLOR(WHT)
@@ -213,7 +224,7 @@
      A  34                                  COLOR(YLW)
      A  35                                  COLOR(PNK)
      A  36                                  COLOR(BLU)
-     A            PLART7        25A  O 21  5
+     A            PLART6        40A  O 18  5
      A                                      OVRDTA
      A  30                                  COLOR(GRN)
      A  31                                  COLOR(WHT)
@@ -222,7 +233,7 @@
      A  34                                  COLOR(YLW)
      A  35                                  COLOR(PNK)
      A  36                                  COLOR(BLU)
-     A            PLART8        25A  O 22  5
+     A            PLART7        40A  O 19  5
      A                                      OVRDTA
      A  30                                  COLOR(GRN)
      A  31                                  COLOR(WHT)
@@ -231,7 +242,7 @@
      A  34                                  COLOR(YLW)
      A  35                                  COLOR(PNK)
      A  36                                  COLOR(BLU)
-     A            PLART9        25A  O 23  5
+     A            PLART8        40A  O 20  5
      A                                      OVRDTA
      A  30                                  COLOR(GRN)
      A  31                                  COLOR(WHT)
@@ -240,7 +251,34 @@
      A  34                                  COLOR(YLW)
      A  35                                  COLOR(PNK)
      A  36                                  COLOR(BLU)
-     A            PLARTA        25A  O 24  5
+     A            PLART9        40A  O 21  5
+     A                                      OVRDTA
+     A  30                                  COLOR(GRN)
+     A  31                                  COLOR(WHT)
+     A  32                                  COLOR(RED)
+     A  33                                  COLOR(TRQ)
+     A  34                                  COLOR(YLW)
+     A  35                                  COLOR(PNK)
+     A  36                                  COLOR(BLU)
+     A            PLARTA        40A  O 22  5
+     A                                      OVRDTA
+     A  30                                  COLOR(GRN)
+     A  31                                  COLOR(WHT)
+     A  32                                  COLOR(RED)
+     A  33                                  COLOR(TRQ)
+     A  34                                  COLOR(YLW)
+     A  35                                  COLOR(PNK)
+     A  36                                  COLOR(BLU)
+     A            PLARTB        40A  O 23  5
+     A                                      OVRDTA
+     A  30                                  COLOR(GRN)
+     A  31                                  COLOR(WHT)
+     A  32                                  COLOR(RED)
+     A  33                                  COLOR(TRQ)
+     A  34                                  COLOR(YLW)
+     A  35                                  COLOR(PNK)
+     A  36                                  COLOR(BLU)
+     A            PLARTC        40A  O 24  5
      A                                      OVRDTA
      A  30                                  COLOR(GRN)
      A  31                                  COLOR(WHT)

@@ -284,7 +284,7 @@ CREATE OR REPLACE TABLE NHAGENCO1.POKEDEX (
     SP_DEF      SMALLINT       NOT NULL,      -- Gen 1: same as SP_ATK
     SPEED       SMALLINT       NOT NULL,
     COLOR       SMALLINT       NOT NULL DEFAULT 1,  -- 1=GRN 2=WHT 3=RED 4=TRQ 5=YLW 6=PNK 7=BLU
-    ASCII_ART   VARCHAR(500) CCSID 37,        -- '#'-delimited, single-line, CCSID 37 so \ and | survive
+    ASCII_ART   VARCHAR(2000) CCSID 37,       -- '#'-delimited, single-line, CCSID 37 so \ and | survive
     BATTLE_CRY  VARCHAR(30),                  -- text displayed on entry
     PRIMARY KEY (PKMN_ID),
     FOREIGN KEY (TYPE1) REFERENCES NHAGENCO1.TYPES(TYPE_ID)
@@ -299,7 +299,7 @@ CREATE OR REPLACE TABLE NHAGENCO1.POKEDEX (
 -- causing reverse image or other weird rendering.
 --
 -- Format: lines separated by '#' (not '|' -- CCSID 273 safe).
--- Max 10 lines, each up to 25 characters wide.
+-- Max 12 lines, each up to 40 characters wide.
 -- POKEBATTLE's ParseArt defensively strips CR/LF at runtime,
 -- but keep the source clean so the column data stays clean too.
 -- ============================================================

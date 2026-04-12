@@ -99,17 +99,19 @@ dcl-pr ShowMsg;
 end-pr;
 
 dcl-pr ParseArt;
-  artStr varchar(500) const;
-  l1  char(25);
-  l2  char(25);
-  l3  char(25);
-  l4  char(25);
-  l5  char(25);
-  l6  char(25);
-  l7  char(25);
-  l8  char(25);
-  l9  char(25);
-  l10 char(25);
+  artStr varchar(2000) const;
+  l1  char(40);
+  l2  char(40);
+  l3  char(40);
+  l4  char(40);
+  l5  char(40);
+  l6  char(40);
+  l7  char(40);
+  l8  char(40);
+  l9  char(40);
+  l10 char(40);
+  l11 char(40);
+  l12 char(40);
 end-pr;
 
 dcl-pr DoAttack likeds(dmg_t);
@@ -248,9 +250,6 @@ BMODE = battleMode;
 write HEADER;
 
 exsr RefreshEnemy;
-
-DIVLIN = *all'-';
-write DIVIDER;
 
 exsr RefreshPlayer;
 
@@ -743,7 +742,8 @@ begsr RefreshEnemy;
     OPSTAT = *blanks;
   endif;
   ParseArt(enmy.art : OPART1 : OPART2 : OPART3 : OPART4 : OPART5
-                     : OPART6 : OPART7 : OPART8 : OPART9 : OPARTA);
+                     : OPART6 : OPART7 : OPART8 : OPART9 : OPARTA
+                     : OPARTB : OPARTC);
 
   // Opponent color indicators: 40=GRN 41=WHT 42=RED 43=TRQ 44=YLW 45=PNK 46=BLU
   *in40 = *off;
@@ -793,7 +793,8 @@ begsr RefreshPlayer;
     PLSTAT = *blanks;
   endif;
   ParseArt(plyr.art : PLART1 : PLART2 : PLART3 : PLART4 : PLART5
-                     : PLART6 : PLART7 : PLART8 : PLART9 : PLARTA);
+                     : PLART6 : PLART7 : PLART8 : PLART9 : PLARTA
+                     : PLARTB : PLARTC);
 
   // Player color indicators: 30=GRN 31=WHT 32=RED 33=TRQ 34=YLW 35=PNK 36=BLU
   *in30 = *off;
@@ -1918,29 +1919,31 @@ dcl-proc ShowMsg;
 end-proc;
 
 // -------------------------------------------------------------
-// ParseArt - Split #-delimited art string into 10 lines
+// ParseArt - Split #-delimited art string into 12 lines
 // -------------------------------------------------------------
 dcl-proc ParseArt;
   dcl-pi *n;
-    artStr varchar(500) const;
-    l1  char(25);
-    l2  char(25);
-    l3  char(25);
-    l4  char(25);
-    l5  char(25);
-    l6  char(25);
-    l7  char(25);
-    l8  char(25);
-    l9  char(25);
-    l10 char(25);
+    artStr varchar(2000) const;
+    l1  char(40);
+    l2  char(40);
+    l3  char(40);
+    l4  char(40);
+    l5  char(40);
+    l6  char(40);
+    l7  char(40);
+    l8  char(40);
+    l9  char(40);
+    l10 char(40);
+    l11 char(40);
+    l12 char(40);
   end-pi;
 
-  dcl-s lines char(25) dim(10);
+  dcl-s lines char(40) dim(12);
   dcl-s lineNum int(5);
   dcl-s startPos int(5);
   dcl-s pos int(5);
   dcl-s artLen int(5);
-  dcl-s cleanArt varchar(500);
+  dcl-s cleanArt varchar(2000);
 
   // Strip embedded control chars (CR/LF/NL) so they can't be
   // interpreted as 5250 field attribute bytes. These sneak in
@@ -1963,12 +1966,14 @@ dcl-proc ParseArt;
     l8 = *blanks;
     l9 = *blanks;
     l10 = *blanks;
+    l11 = *blanks;
+    l12 = *blanks;
     return;
   endif;
 
   for pos = 1 to artLen;
     if %subst(cleanArt : pos : 1) = '#';
-      if lineNum <= 10;
+      if lineNum <= 12;
         if pos > startPos;
           lines(lineNum) = %subst(cleanArt : startPos : pos - startPos);
         endif;
@@ -1978,7 +1983,7 @@ dcl-proc ParseArt;
     endif;
   endfor;
 
-  if startPos <= artLen and lineNum <= 10;
+  if startPos <= artLen and lineNum <= 12;
     lines(lineNum) = %subst(cleanArt : startPos : artLen - startPos + 1);
   endif;
 
@@ -1992,4 +1997,6 @@ dcl-proc ParseArt;
   l8  = lines(8);
   l9  = lines(9);
   l10 = lines(10);
+  l11 = lines(11);
+  l12 = lines(12);
 end-proc;
