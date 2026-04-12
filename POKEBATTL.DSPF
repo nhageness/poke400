@@ -389,24 +389,31 @@
      A                                      CA12(12 'F12=Back')
      A            CSRRCD        10A  H
      A            CSRFLD        10A  H
+     A            FORCED         1A  H
      A                                  1  2'Choose a Pokemon:'
      A                                      DSPATR(HI)
-     A            PW1NAM        12A  B  3  3
+     A            CURPW1         1A  B  3  3DSPATR(HI)
      A                                      DSPATR(PC)
+     A            PW1NAM        12A  O  3  5
      A  90                                  DSPATR(HI RI)
-     A            PW1HP          7A  O  3 18
-     A            PW2NAM        12A  B  3 26
+     A            PW1HP          7A  O  3 20
+     A            CURPW2         1A  B  3 26DSPATR(HI)
+     A            PW2NAM        12A  O  3 28
      A  91                                  DSPATR(HI RI)
-     A            PW2HP          7A  O  3 41
-     A            PW3NAM        12A  B  5  3
+     A            PW2HP          7A  O  3 43
+     A            CURPW3         1A  B  5  3DSPATR(HI)
+     A            PW3NAM        12A  O  5  5
      A  92                                  DSPATR(HI RI)
-     A            PW3HP          7A  O  5 18
-     A            PW4NAM        12A  B  5 26
+     A            PW3HP          7A  O  5 20
+     A            CURPW4         1A  B  5 26DSPATR(HI)
+     A            PW4NAM        12A  O  5 28
      A  93                                  DSPATR(HI RI)
-     A            PW4HP          7A  O  5 41
-     A            PW5NAM        12A  B  7  3
+     A            PW4HP          7A  O  5 43
+     A            CURPW5         1A  B  7  3DSPATR(HI)
+     A            PW5NAM        12A  O  7  5
      A  94                                  DSPATR(HI RI)
-     A            PW5HP          7A  O  7 18
-     A            PW6NAM        12A  B  7 26
+     A            PW5HP          7A  O  7 20
+     A            CURPW6         1A  B  7 26DSPATR(HI)
+     A            PW6NAM        12A  O  7 28
      A  95                                  DSPATR(HI RI)
-     A            PW6HP          7A  O  7 41
+     A            PW6HP          7A  O  7 43

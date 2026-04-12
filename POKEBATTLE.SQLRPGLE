@@ -168,6 +168,7 @@ dcl-pr PickMove int(10);
 end-pr;
 
 dcl-pr PickSwitchVoluntary int(10);
+  forced ind const;
 end-pr;
 
 // ----- Global Variables -----
@@ -337,7 +338,7 @@ dow battleOn;
           actionPicked = *on;
         endif;
       when FieldToAction(CSRFLD) = 'P';
-        switchSlot = PickSwitchVoluntary();
+        switchSlot = PickSwitchVoluntary(*off);
         if switchSlot > 0;
           turnAction = 'S';
           actionPicked = *on;
@@ -1039,96 +1040,17 @@ begsr HandlePlayerSwitch;
   endif;
 endsr;
 
-// --- Pick switch Pokemon after faint ---
+// --- Pick switch Pokemon after faint (forced) ---
+//     Routes through PKMNWIN with FORCED='1'; F12 is ignored by
+//     PickSwitchVoluntary when forced. F3 still abandons battle.
 begsr PickSwitch;
-  swCount = 0;
-
-  exec sql DECLARE c_switch CURSOR FOR
-    SELECT bp.TEAM_SLOT, p.PKMN_NAME, bp.CURRENT_HP, bp.MAX_HP
-      FROM NHAGENCO1.BATTLE_POKEMON bp
-      JOIN NHAGENCO1.POKEDEX p ON p.PKMN_ID = bp.PKMN_ID
-     WHERE bp.ROOM_CODE = :pRoomCode
-       AND bp.PLAYER = :pPlayer
-       AND bp.CURRENT_HP > 0
-       AND bp.IS_ACTIVE = 'N'
-     ORDER BY bp.TEAM_SLOT;
-
-  exec sql OPEN c_switch;
-  for i = 1 to 6;
-    exec sql FETCH c_switch
-      INTO :wSlot, :wSName, :wSCurHP, :wSMaxHP;
-    if sqlcode <> 0;
-      leave;
-    endif;
-    swCount += 1;
-    swSlot(swCount) = wSlot;
-    swName(swCount) = wSName;
-    swCurHP(swCount) = wSCurHP;
-    swMaxHP(swCount) = wSMaxHP;
-  endfor;
-  exec sql CLOSE c_switch;
-
-  SW1NAM = *blanks;
-  SW1HP  = *blanks;
-  SW2NAM = *blanks;
-  SW2HP  = *blanks;
-  SW3NAM = *blanks;
-  SW3HP  = *blanks;
-  SW4NAM = *blanks;
-  SW4HP  = *blanks;
-  SW5NAM = *blanks;
-  SW5HP  = *blanks;
-  SW6NAM = *blanks;
-  SW6HP  = *blanks;
-
-  for i = 1 to swCount;
-    select;
-      when i = 1;
-        SW1NAM = %trim(%char(i)) + '.' + %trim(swName(i));
-        SW1HP = %trim(%char(swCurHP(i))) + '/'
-              + %trim(%char(swMaxHP(i)));
-      when i = 2;
-        SW2NAM = %trim(%char(i)) + '.' + %trim(swName(i));
-        SW2HP = %trim(%char(swCurHP(i))) + '/'
-              + %trim(%char(swMaxHP(i)));
-      when i = 3;
-        SW3NAM = %trim(%char(i)) + '.' + %trim(swName(i));
-        SW3HP = %trim(%char(swCurHP(i))) + '/'
-              + %trim(%char(swMaxHP(i)));
-      when i = 4;
-        SW4NAM = %trim(%char(i)) + '.' + %trim(swName(i));
-        SW4HP = %trim(%char(swCurHP(i))) + '/'
-              + %trim(%char(swMaxHP(i)));
-      when i = 5;
-        SW5NAM = %trim(%char(i)) + '.' + %trim(swName(i));
-        SW5HP = %trim(%char(swCurHP(i))) + '/'
-              + %trim(%char(swMaxHP(i)));
-      when i = 6;
-        SW6NAM = %trim(%char(i)) + '.' + %trim(swName(i));
-        SW6HP = %trim(%char(swCurHP(i))) + '/'
-              + %trim(%char(swMaxHP(i)));
-    endsl;
-  endfor;
-
-  switchOk = *off;
-  dow not switchOk;
-    SWSEL = ' ';
-    exfmt SWITCHMN;
-
-    if *in03;
-      leavesr;
-    endif;
-
-    if SWSEL < '1' or SWSEL > '6';
-      iter;
-    endif;
-    swChoice = %int(SWSEL);
-    if swChoice > swCount;
-      iter;
-    endif;
-
-    switchOk = *on;
-  enddo;
+  swChoice = PickSwitchVoluntary(*on);
+  if *in03;
+    leavesr;
+  endif;
+  if swChoice <= 0;
+    leavesr;
+  endif;
 
   exec sql
     UPDATE NHAGENCO1.BATTLE_POKEMON
@@ -1136,13 +1058,12 @@ begsr PickSwitch;
      WHERE ROOM_CODE = :pRoomCode
        AND PLAYER = :pPlayer;
 
-  wSlot = swSlot(swChoice);
   exec sql
     UPDATE NHAGENCO1.BATTLE_POKEMON
        SET IS_ACTIVE = 'Y'
      WHERE ROOM_CODE = :pRoomCode
        AND PLAYER = :pPlayer
-       AND TEAM_SLOT = :wSlot;
+       AND TEAM_SLOT = :swChoice;
 
   LoadActivePkmn(plyr : pRoomCode : pPlayer);
 endsr;
@@ -2257,17 +2178,17 @@ dcl-proc FieldToSlotIdx;
     fld char(10) const;
   end-pi;
   select;
-    when %trim(fld) = 'PW1NAM';
+    when %trim(fld) = 'CURPW1';
       return 1;
-    when %trim(fld) = 'PW2NAM';
+    when %trim(fld) = 'CURPW2';
       return 2;
-    when %trim(fld) = 'PW3NAM';
+    when %trim(fld) = 'CURPW3';
       return 3;
-    when %trim(fld) = 'PW4NAM';
+    when %trim(fld) = 'CURPW4';
       return 4;
-    when %trim(fld) = 'PW5NAM';
+    when %trim(fld) = 'CURPW5';
       return 5;
-    when %trim(fld) = 'PW6NAM';
+    when %trim(fld) = 'CURPW6';
       return 6;
   endsl;
   return 0;
@@ -2327,6 +2248,7 @@ end-proc;
 // -------------------------------------------------------------
 dcl-proc PickSwitchVoluntary;
   dcl-pi *n int(10);
+    forced ind const;
   end-pi;
   dcl-s choice int(10);
   dcl-s i int(10);
@@ -2361,6 +2283,12 @@ dcl-proc PickSwitchVoluntary;
     endif;
   endfor;
 
+  if forced;
+    FORCED = '1';
+  else;
+    FORCED = '0';
+  endif;
+
   dow *on;
     // Slot 1
     if slots(1).present;
@@ -2369,13 +2297,16 @@ dcl-proc PickSwitchVoluntary;
             + %trim(%char(slots(1).mx));
       if slots(1).hp <= 0;
         *in90 = *on;
+        CURPW1 = ' ';
       else;
         *in90 = *off;
+        CURPW1 = '>';
       endif;
     else;
       PW1NAM = *blanks;
       PW1HP = *blanks;
       *in90 = *off;
+      CURPW1 = ' ';
     endif;
 
     // Slot 2
@@ -2385,13 +2316,16 @@ dcl-proc PickSwitchVoluntary;
             + %trim(%char(slots(2).mx));
       if slots(2).hp <= 0;
         *in91 = *on;
+        CURPW2 = ' ';
       else;
         *in91 = *off;
+        CURPW2 = '>';
       endif;
     else;
       PW2NAM = *blanks;
       PW2HP = *blanks;
       *in91 = *off;
+      CURPW2 = ' ';
     endif;
 
     // Slot 3
@@ -2401,13 +2335,16 @@ dcl-proc PickSwitchVoluntary;
             + %trim(%char(slots(3).mx));
       if slots(3).hp <= 0;
         *in92 = *on;
+        CURPW3 = ' ';
       else;
         *in92 = *off;
+        CURPW3 = '>';
       endif;
     else;
       PW3NAM = *blanks;
       PW3HP = *blanks;
       *in92 = *off;
+      CURPW3 = ' ';
     endif;
 
     // Slot 4
@@ -2417,13 +2354,16 @@ dcl-proc PickSwitchVoluntary;
             + %trim(%char(slots(4).mx));
       if slots(4).hp <= 0;
         *in93 = *on;
+        CURPW4 = ' ';
       else;
         *in93 = *off;
+        CURPW4 = '>';
       endif;
     else;
       PW4NAM = *blanks;
       PW4HP = *blanks;
       *in93 = *off;
+      CURPW4 = ' ';
     endif;
 
     // Slot 5
@@ -2433,13 +2373,16 @@ dcl-proc PickSwitchVoluntary;
             + %trim(%char(slots(5).mx));
       if slots(5).hp <= 0;
         *in94 = *on;
+        CURPW5 = ' ';
       else;
         *in94 = *off;
+        CURPW5 = '>';
       endif;
     else;
       PW5NAM = *blanks;
       PW5HP = *blanks;
       *in94 = *off;
+      CURPW5 = ' ';
     endif;
 
     // Slot 6
@@ -2449,17 +2392,26 @@ dcl-proc PickSwitchVoluntary;
             + %trim(%char(slots(6).mx));
       if slots(6).hp <= 0;
         *in95 = *on;
+        CURPW6 = ' ';
       else;
         *in95 = *off;
+        CURPW6 = '>';
       endif;
     else;
       PW6NAM = *blanks;
       PW6HP = *blanks;
       *in95 = *off;
+      CURPW6 = ' ';
     endif;
 
     exfmt PKMNWIN;
+    if *in03;
+      return 0;
+    endif;
     if *in12;
+      if forced;
+        iter;
+      endif;
       return 0;
     endif;
 
