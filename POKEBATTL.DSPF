@@ -364,10 +364,10 @@
      A                                      DSPATR(HI)
      A            CURFGT         1A  B 26 10DSPATR(HI)
      A                                      DSPATR(PC)
-     A                                 26 11'FIGHT'
+     A                                 26 12'FIGHT'
      A                                      DSPATR(HI)
      A            CURPKM         1A  B 26 30DSPATR(HI)
-     A                                 26 31'PKMN'
+     A                                 26 32'PKMN'
      A                                      DSPATR(HI)
      A                                 25 50'Move cursor, Enter=Pick'
      A                                      DSPATR(HI)
