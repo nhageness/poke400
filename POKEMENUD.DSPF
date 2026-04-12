@@ -40,11 +40,9 @@
      A                                      COLOR(RED)
      A                                  6 60' |---(O)---| '
      A                                      COLOR(WHT)
-     A                                  7 60' |         | '
+     A                                  7 60'  \       /  '
      A                                      COLOR(WHT)
-     A                                  8 60'  \       /  '
-     A                                      COLOR(WHT)
-     A                                  9 60'   \_____/   '
+     A                                  8 60'   \_____/   '
      A                                      COLOR(WHT)
      A                                 11 60'P O K E 4 0 0'
      A                                      DSPATR(HI)
