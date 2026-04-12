@@ -150,6 +150,22 @@ dcl-pr SavePkmnState;
   player int(5) const;
 end-pr;
 
+// Cursor-to-selection helpers
+dcl-pr CursorToAction char(1);
+  row int(10) const;
+  col int(10) const;
+end-pr;
+
+dcl-pr CursorToMoveIdx int(10);
+  row int(10) const;
+  col int(10) const;
+end-pr;
+
+dcl-pr CursorToSlotIdx int(10);
+  row int(10) const;
+  col int(10) const;
+end-pr;
+
 // ----- Global Variables -----
 dcl-ds plyr likeds(pkmn_t) inz;
 dcl-ds enmy likeds(pkmn_t) inz;
@@ -1999,4 +2015,87 @@ dcl-proc ParseArt;
   l10 = lines(10);
   l11 = lines(11);
   l12 = lines(12);
+end-proc;
+
+// -------------------------------------------------------------
+// CursorToAction - Map ACTMENU cursor coords to action letter
+// 'F' = fight, 'P' = pkmn, ' ' = invalid
+// -------------------------------------------------------------
+dcl-proc CursorToAction;
+  dcl-pi *n char(1);
+    row int(10) const;
+    col int(10) const;
+  end-pi;
+  // ACTMENU labels on row 26: FIGHT at col 10, PKMN at col 30.
+  if row = 26;
+    if col >= 5 and col <= 20;
+      return 'F';
+    endif;
+    if col >= 25 and col <= 40;
+      return 'P';
+    endif;
+  endif;
+  return ' ';
+end-proc;
+
+// -------------------------------------------------------------
+// CursorToMoveIdx - Map MOVEMENU cursor coords to move 1-4, 0 if invalid
+// -------------------------------------------------------------
+dcl-proc CursorToMoveIdx;
+  dcl-pi *n int(10);
+    row int(10) const;
+    col int(10) const;
+  end-pi;
+  // MOVEMENU window at screen (10,30), 7 rows x 60 cols.
+  // Window row 2 = screen row 11, window row 3 = screen row 12.
+  // Move 1 target screen col 31, move 2 col 59,
+  // move 3 col 31, move 4 col 59.
+  if row = 11;
+    if col >= 30 and col <= 55;
+      return 1;
+    endif;
+    if col >= 58 and col <= 90;
+      return 2;
+    endif;
+  endif;
+  if row = 12;
+    if col >= 30 and col <= 55;
+      return 3;
+    endif;
+    if col >= 58 and col <= 90;
+      return 4;
+    endif;
+  endif;
+  return 0;
+end-proc;
+
+// -------------------------------------------------------------
+// CursorToSlotIdx - Map PKMNWIN cursor coords to slot 1-6, 0 if invalid
+// -------------------------------------------------------------
+dcl-proc CursorToSlotIdx;
+  dcl-pi *n int(10);
+    row int(10) const;
+    col int(10) const;
+  end-pi;
+  dcl-s rowIdx int(10) inz(0);
+  // PKMNWIN window at screen (8,40), 10 rows x 50 cols.
+  // Content window rows 3/5/7 -> screen rows 10/12/14.
+  // Left target screen col 41, right target screen col 64.
+  select;
+    when row = 10;
+      rowIdx = 0;
+    when row = 12;
+      rowIdx = 2;
+    when row = 14;
+      rowIdx = 4;
+    other;
+      return 0;
+  endsl;
+  if col >= 40 and col <= 60;
+    return rowIdx + 1;
+  endif;
+  if col >= 63 and col <= 88;
+    return rowIdx + 2;
+  endif;
+  return 0;
 end-proc;
