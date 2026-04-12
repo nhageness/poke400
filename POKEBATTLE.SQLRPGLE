@@ -181,6 +181,10 @@ dcl-ds result2 likeds(dmg_t) inz;
 
 dcl-s battleOn ind inz(*on);
 dcl-s moveChoice int(5);
+dcl-s vswSide char(1);
+dcl-s vswNewSlot int(5);
+dcl-s vswTargetPlayer int(5);
+dcl-s vswIsPlayer ind;
 dcl-s aiMoveIdx int(5);
 dcl-s enmyMoveIdx int(5);
 dcl-s i int(5);
@@ -1026,6 +1030,75 @@ begsr PickSwitch;
        AND TEAM_SLOT = :wSlot;
 
   LoadActivePkmn(plyr : pRoomCode : pPlayer);
+endsr;
+
+// --- ApplyVoluntarySwitch: swap active Pokemon for one side ---
+//     Reads globals: vswSide ('P' player / 'E' enemy), vswNewSlot.
+//     Saves outgoing state, flips IS_ACTIVE, reloads DS, clears
+//     volatile (stat stages / Leech Seed), and runs entry WRITE seq.
+//     Mainline subr (not proc) so it can EXSR RefreshPlayer/Enemy.
+begsr ApplyVoluntarySwitch;
+  if vswSide = 'P';
+    vswTargetPlayer = pPlayer;
+    vswIsPlayer = *on;
+  else;
+    vswTargetPlayer = enmyPlayer;
+    vswIsPlayer = *off;
+  endif;
+
+  // Save the outgoing active Pokemon's HP/PP/status
+  if vswIsPlayer;
+    SavePkmnState(plyr : pRoomCode : pPlayer);
+  else;
+    SavePkmnState(enmy : pRoomCode : enmyPlayer);
+  endif;
+
+  // Flip IS_ACTIVE in the DB
+  exec sql
+    UPDATE NHAGENCO1.BATTLE_POKEMON
+       SET IS_ACTIVE = 'N'
+     WHERE ROOM_CODE = :pRoomCode
+       AND PLAYER = :vswTargetPlayer
+       AND IS_ACTIVE = 'Y';
+  exec sql
+    UPDATE NHAGENCO1.BATTLE_POKEMON
+       SET IS_ACTIVE = 'Y'
+     WHERE ROOM_CODE = :pRoomCode
+       AND PLAYER = :vswTargetPlayer
+       AND TEAM_SLOT = :vswNewSlot;
+
+  // Reload DS from the new active row and reset volatile state.
+  // Persistent status (burn/poison/etc) lives in the DB row and
+  // comes back with the reload; only wipe RPG-only fields.
+  if vswIsPlayer;
+    LoadActivePkmn(plyr : pRoomCode : pPlayer);
+    plyr.atkStg = 0;
+    plyr.defStg = 0;
+    plyr.spaStg = 0;
+    plyr.spdStg = 0;
+    plyr.speStg = 0;
+    plyr.accStg = 0;
+    plyr.seeded = *off;
+    exsr RefreshPlayer;
+    ShowMsg('Go! ' + %trim(plyr.name) + '!');
+    if plyr.cry <> *blanks;
+      ShowMsg(%trim(plyr.name) + ': ' + %trim(plyr.cry));
+    endif;
+  else;
+    LoadActivePkmn(enmy : pRoomCode : enmyPlayer);
+    enmy.atkStg = 0;
+    enmy.defStg = 0;
+    enmy.spaStg = 0;
+    enmy.spdStg = 0;
+    enmy.speStg = 0;
+    enmy.accStg = 0;
+    enmy.seeded = *off;
+    exsr RefreshEnemy;
+    ShowMsg('Enemy sent out ' + %trim(enmy.name) + '!');
+    if enmy.cry <> *blanks;
+      ShowMsg(%trim(enmy.name) + ': ' + %trim(enmy.cry));
+    endif;
+  endif;
 endsr;
 
 // =============================================================
