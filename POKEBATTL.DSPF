@@ -308,7 +308,7 @@
      A*  Cursor-based: arrow keys to target field, Enter to pick.
      A          R MOVEMENU
      A                                      OVERLAY
-     A                                      WINDOW(10 30 7 60)
+     A                                      WINDOW(18 68 7 60)
      A                                      WDWBORDER((*COLOR BLU) -
      A                                      (*DSPATR RI) -
      A                                      (*CHAR '        '))
