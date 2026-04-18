@@ -17,3 +17,7 @@ package-lock.json
 # Local-only (not shared to GitHub)
 tools/
 docs/
+
+# Local SQL migration log — one-off scripts already applied to pub400.
+# Final schema/seed state lives in pokemon_battle_engine.sql + seed_moves.sql.
+work.sql
