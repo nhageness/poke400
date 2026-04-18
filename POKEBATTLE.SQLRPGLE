@@ -37,6 +37,8 @@ dcl-ds move_t qualified template;
   phys  char(1);
   effect  char(10);
   effPct  int(5);
+  minHits int(5);
+  maxHits int(5);
 end-ds;
 
 dcl-ds pkmn_t qualified template;
@@ -65,6 +67,7 @@ dcl-ds pkmn_t qualified template;
   spdStg  int(5);
   speStg  int(5);
   accStg  int(5);
+  evaStg  int(5);
   seeded  ind;
   baseSpd int(5);
   color   int(5);
@@ -132,6 +135,12 @@ end-pr;
 dcl-pr ApplyStage int(5);
   baseStat int(5) const;
   stage    int(5) const;
+end-pr;
+
+dcl-pr GetHitCount int(5);
+  minHits int(5) const;
+  maxHits int(5) const;
+  seed    packed(7:6) const;
 end-pr;
 
 dcl-pr Delay;
@@ -1105,6 +1114,7 @@ begsr ApplyVoluntarySwitch;
     plyr.spdStg = 0;
     plyr.speStg = 0;
     plyr.accStg = 0;
+    plyr.evaStg = 0;
     plyr.seeded = *off;
     exsr RefreshPlayer;
     ShowMsg('Go! ' + %trim(plyr.name) + '!');
@@ -1119,6 +1129,7 @@ begsr ApplyVoluntarySwitch;
     enmy.spdStg = 0;
     enmy.speStg = 0;
     enmy.accStg = 0;
+    enmy.evaStg = 0;
     enmy.seeded = *off;
     exsr RefreshEnemy;
     ShowMsg('Enemy sent out ' + %trim(enmy.name) + '!');
@@ -1152,6 +1163,10 @@ dcl-proc DoAttack;
   dcl-s mvEffect char(10);
   dcl-s healAmt  int(5);
   dcl-s recoilAmt int(5);
+  dcl-s effAcc   int(5);
+  dcl-s hitCount int(5);
+  dcl-s hitIdx   int(5);
+  dcl-s hitsLanded int(5);
 
   // --- Status check: can this Pokemon act? ---
   if attacker.status = 'PARALYZE';
@@ -1210,9 +1225,12 @@ dcl-proc DoAttack;
   // --- Status-only moves (power = 0) ---
   if attacker.moves(moveIdx).power = 0;
 
-    // Accuracy check for status moves
+    // Accuracy check for status moves (with acc/eva stages)
     exec sql SET :statusRoll = RAND();
-    if (statusRoll * 100) >= attacker.moves(moveIdx).acc;
+    effAcc = attacker.moves(moveIdx).acc
+           * ApplyStage(100 : attacker.accStg)
+           / ApplyStage(100 : defender.evaStg);
+    if (statusRoll * 100) >= effAcc;
       ShowMsg(%trim(attacker.name) + '''s attack missed!');
       return res;
     endif;
@@ -1263,13 +1281,72 @@ dcl-proc DoAttack;
           ShowMsg('But it failed!');
         endif;
 
-      // Stat boosts (Withdraw = DEF UP)
+      // Stat boosts on self
       when mvEffect = 'DEF UP';
         if attacker.defStg < 6;
           attacker.defStg += 1;
           ShowMsg(%trim(attacker.name) + '''s defense rose!');
         else;
           ShowMsg(%trim(attacker.name) + '''s defense won''t go higher!');
+        endif;
+
+      when mvEffect = 'ATK UP';
+        if attacker.atkStg < 6;
+          attacker.atkStg += 1;
+          ShowMsg(%trim(attacker.name) + '''s attack rose!');
+        else;
+          ShowMsg(%trim(attacker.name) + '''s attack won''t go higher!');
+        endif;
+
+      when mvEffect = 'SPDEF UP';
+        if attacker.spdStg < 6;
+          attacker.spdStg += 1;
+          ShowMsg(%trim(attacker.name) + '''s sp. defense rose!');
+        else;
+          ShowMsg(%trim(attacker.name)
+                + '''s sp. defense won''t go higher!');
+        endif;
+
+      when mvEffect = 'EVA UP';
+        if attacker.evaStg < 6;
+          attacker.evaStg += 1;
+          ShowMsg(%trim(attacker.name) + '''s evasion rose!');
+        else;
+          ShowMsg(%trim(attacker.name) + '''s evasion won''t go higher!');
+        endif;
+
+      when mvEffect = 'SPD UP';
+        if attacker.speStg < 6;
+          attacker.speStg += 1;
+          ShowMsg(%trim(attacker.name) + '''s speed rose!');
+        else;
+          ShowMsg(%trim(attacker.name) + '''s speed won''t go higher!');
+        endif;
+
+      // Healing (Recover, Soft Boiled): restore 1/2 max HP
+      when mvEffect = 'HEAL';
+        if attacker.hp >= attacker.maxHp;
+          ShowMsg('But it failed!');
+        else;
+          healAmt = attacker.maxHp / 2;
+          if healAmt < 1;
+            healAmt = 1;
+          endif;
+          attacker.hp += healAmt;
+          if attacker.hp > attacker.maxHp;
+            attacker.hp = attacker.maxHp;
+          endif;
+          ShowMsg(%trim(attacker.name) + ' regained health!');
+          if isPlayer;
+            PLHPBR = BuildHPBar(attacker.hp : attacker.maxHp);
+            PLCRHP = attacker.hp;
+            write PLAYER;
+          else;
+            OPHPBR = BuildHPBar(attacker.hp : attacker.maxHp);
+            OPCRHP = attacker.hp;
+            write OPPONENT;
+          endif;
+          Delay(1);
         endif;
 
       // Stat drops on opponent
@@ -1287,6 +1364,22 @@ dcl-proc DoAttack;
           ShowMsg(%trim(defender.name) + '''s speed fell!');
         else;
           ShowMsg(%trim(defender.name) + '''s speed won''t go lower!');
+        endif;
+
+      when mvEffect = 'ATK DOWN';
+        if defender.atkStg > -6;
+          defender.atkStg -= 1;
+          ShowMsg(%trim(defender.name) + '''s attack fell!');
+        else;
+          ShowMsg(%trim(defender.name) + '''s attack won''t go lower!');
+        endif;
+
+      when mvEffect = 'DEF DOWN';
+        if defender.defStg > -6;
+          defender.defStg -= 1;
+          ShowMsg(%trim(defender.name) + '''s defense fell!');
+        else;
+          ShowMsg(%trim(defender.name) + '''s defense won''t go lower!');
         endif;
 
       // Fixed damage moves with no power
@@ -1358,22 +1451,40 @@ dcl-proc DoAttack;
     return res;
   endif;
 
-  // Apply damage
-  defender.hp -= res.damage;
-  if defender.hp < 0;
-    defender.hp = 0;
-  endif;
+  // Apply damage (multi-hit aware)
+  hitCount = GetHitCount(attacker.moves(moveIdx).minHits
+                       : attacker.moves(moveIdx).maxHits
+                       : accRoll);
+  hitsLanded = 0;
+  for hitIdx = 1 to hitCount;
+    defender.hp -= res.damage;
+    if defender.hp < 0;
+      defender.hp = 0;
+    endif;
+    hitsLanded += 1;
 
-  if isPlayer;
-    OPHPBR = BuildHPBar(defender.hp : defender.maxHp);
-    OPCRHP = defender.hp;
-    write OPPONENT;
-  else;
-    PLHPBR = BuildHPBar(defender.hp : defender.maxHp);
-    PLCRHP = defender.hp;
-    write PLAYER;
+    if isPlayer;
+      OPHPBR = BuildHPBar(defender.hp : defender.maxHp);
+      OPCRHP = defender.hp;
+      write OPPONENT;
+    else;
+      PLHPBR = BuildHPBar(defender.hp : defender.maxHp);
+      PLCRHP = defender.hp;
+      write PLAYER;
+    endif;
+    Delay(1);
+
+    if defender.hp = 0;
+      leave;
+    endif;
+  endfor;
+
+  // Aggregate damage across all hits for downstream (recoil/drain)
+  res.damage = res.damage * hitsLanded;
+
+  if hitsLanded > 1;
+    ShowMsg('Hit ' + %trim(%char(hitsLanded)) + ' times!');
   endif;
-  Delay(1);
 
   if res.isCrit;
     ShowMsg('A critical hit!');
@@ -1603,6 +1714,8 @@ dcl-proc LoadActivePkmn;
   dcl-s wMvPhy char(1);
   dcl-s wMvEff char(10);
   dcl-s wMvEPct int(5);
+  dcl-s wMvMin int(5);
+  dcl-s wMvMax int(5);
   dcl-s niPwr  int(5);
   dcl-s niEff  int(5);
   dcl-s niEPct int(5);
@@ -1720,10 +1833,11 @@ dcl-proc LoadActivePkmn;
       exec sql
         SELECT MOVE_ID, MOVE_NAME, TYPE_ID,
                POWER, ACCURACY, PP, IS_PHYSICAL,
-               EFFECT, EFFECT_PCT
+               EFFECT, EFFECT_PCT, MIN_HITS, MAX_HITS
           INTO :wMvId, :wMvNm, :wMvTyp,
                :wMvPwr :niPwr, :wMvAcc, :wMvPP, :wMvPhy,
-               :wMvEff :niEff, :wMvEPct :niEPct
+               :wMvEff :niEff, :wMvEPct :niEPct,
+               :wMvMin, :wMvMax
           FROM NHAGENCO1.MOVES
          WHERE MOVE_ID = :wMvId;
 
@@ -1747,6 +1861,8 @@ dcl-proc LoadActivePkmn;
         if niEPct >= 0;
           ds.moves(k).effPct = wMvEPct;
         endif;
+        ds.moves(k).minHits = wMvMin;
+        ds.moves(k).maxHits = wMvMax;
       endif;
     endif;
   endfor;
@@ -1835,7 +1951,9 @@ dcl-proc CalcDamage;
 
   lMvTyp  = mv.typ;
   lMvPwr  = mv.power;
-  lMvAcc  = mv.acc;
+  lMvAcc  = mv.acc
+          * ApplyStage(100 : atk.accStg)
+          / ApplyStage(100 : def.evaStg);
   lDefT1  = def.type1;
   lDefT2  = def.type2;
   lAtkT1  = atk.type1;
@@ -1965,6 +2083,48 @@ dcl-proc ApplyStage;
   endif;
 
   return baseStat * num / den;
+end-proc;
+
+// -------------------------------------------------------------
+// GetHitCount - Number of hits for a multi-hit move
+// Single-hit when minHits = maxHits = 1 (the default).
+// Gen 1 2-5 hit distribution: 3/8, 3/8, 1/8, 1/8.
+// seed is a [0,1) value (typically accRoll) so MP hosts agree.
+// -------------------------------------------------------------
+dcl-proc GetHitCount;
+  dcl-pi *n int(5);
+    minHits int(5) const;
+    maxHits int(5) const;
+    seed    packed(7:6) const;
+  end-pi;
+
+  dcl-s bucket int(5);
+
+  if minHits < 1 or maxHits < minHits;
+    return 1;
+  endif;
+
+  if minHits = maxHits;
+    return minHits;
+  endif;
+
+  // Gen 1 2-5 distribution
+  if minHits = 2 and maxHits = 5;
+    bucket = %int(seed * 8);
+    select;
+      when bucket <= 2;
+        return 2;
+      when bucket <= 5;
+        return 3;
+      when bucket = 6;
+        return 4;
+      other;
+        return 5;
+    endsl;
+  endif;
+
+  // Fallback: uniform across [minHits, maxHits]
+  return minHits + %int(seed * (maxHits - minHits + 1));
 end-proc;
 
 // -------------------------------------------------------------
